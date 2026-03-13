@@ -1,0 +1,63 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+body {
+  @apply bg-ink text-white;
+  background-image:
+    radial-gradient(circle at 10% 20%, rgba(78, 205, 196, 0.16), transparent 24%),
+    radial-gradient(circle at 90% 10%, rgba(255, 138, 91, 0.14), transparent 22%),
+    linear-gradient(180deg, #080b14 0%, #0b1020 100%);
+}
+
+.glass-panel {
+  @apply rounded-4xl border border-white/10 bg-white/5 backdrop-blur-xl;
+}
+
+.prose-katex {
+  overflow-x: auto;
+}
+
+.chat-markdown {
+  @apply max-w-none text-sm leading-7 text-mist;
+}
+
+.chat-markdown h1,
+.chat-markdown h2,
+.chat-markdown h3,
+.chat-markdown h4 {
+  @apply mt-6 mb-3 font-semibold text-white;
+}
+
+.chat-markdown p {
+  @apply my-3 text-mist;
+}
+
+.chat-markdown ul,
+.chat-markdown ol {
+  @apply my-4 pl-6 text-mist;
+}
+
+.chat-markdown li {
+  @apply my-1;
+}
+
+.chat-markdown strong {
+  @apply font-semibold text-white;
+}
+
+.chat-markdown code {
+  @apply rounded-lg bg-white/10 px-1.5 py-0.5 text-xs text-brand;
+}
+
+.chat-markdown pre {
+  @apply overflow-x-auto rounded-2xl border border-white/10 bg-black/30 p-4;
+}
+
+.chat-markdown blockquote {
+  @apply my-4 border-l-2 border-brand/40 pl-4 text-mist;
+}

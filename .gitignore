@@ -1,0 +1,50 @@
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+dist/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# IDE
+.idea/
+.vscode/
+
+# Local storage / runtime data
+storage/
+apps/api/storage/
+*.sqlite3
+*.db
+
+# Logs
+*.log
+logs/
+
+# OS / temp
+.tmp/
+tmp/
+*.tmp
