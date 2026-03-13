@@ -26,12 +26,12 @@ type PaperWorkbenchProps = {
 
 const tabs: Array<{ id: TabId; label: string }> = [
   { id: "overview", label: "概览" },
-  { id: "motivation", label: "动机与贡献" },
-  { id: "method", label: "方法" },
-  { id: "experiments", label: "实验" },
-  { id: "chat", label: "问答" },
-  { id: "reading", label: "推荐阅读" },
-  { id: "memory", label: "阅读记忆" },
+  { id: "motivation", label: "特性" },
+  { id: "method", label: "技能" },
+  { id: "experiments", label: "对战" },
+  { id: "chat", label: "追问" },
+  { id: "reading", label: "进化路线" },
+  { id: "memory", label: "档案" },
 ];
 
 export function PaperWorkbench({
@@ -72,12 +72,12 @@ export function PaperWorkbench({
               ))}
             </ul>
           </OverviewCard>
-          <OverviewCard eyebrow="迁移启发" title="可以借鉴到其他领域的地方">
+          <OverviewCard eyebrow="迁移启发" title="可迁移点">
             <div className="space-y-4">
               {overview.transferable_insights.map((item, index) => (
-                <div key={`${item.idea}-${index}`} className="rounded-3xl border border-white/10 bg-white/5 p-4">
-                  <p className="text-white">{item.idea}</p>
-                  <p className="mt-2 text-sm leading-7 text-mist">{item.how_to_apply}</p>
+                <div key={`${item.idea}-${index}`} className="rounded-3xl border border-black/10 bg-white/55 p-4">
+                  <p className="text-slate-900">{item.idea}</p>
+                  <p className="mt-2 text-sm leading-7 text-slate-700">{item.how_to_apply}</p>
                 </div>
               ))}
             </div>
@@ -89,16 +89,16 @@ export function PaperWorkbench({
     if (activeTab === "method") {
       return (
         <div className="grid gap-4">
-          <OverviewCard eyebrow="方法主线" title="方法概述">
+          <OverviewCard eyebrow="方法主线" title="主线">
             {overview.method_summary}
           </OverviewCard>
           <OverviewCard eyebrow="关键模块" title="哪个模块起作用">
             <div className="space-y-4">
               {overview.key_modules.map((module, index) => (
-                <div key={`${module.name}-${index}`} className="rounded-3xl border border-white/10 bg-white/5 p-4">
-                  <p className="text-base font-medium text-white">{module.name}</p>
-                  <p className="mt-2 text-sm leading-7 text-mist">{module.purpose}</p>
-                  <p className="mt-2 text-sm leading-7 text-brand">{module.why_it_matters}</p>
+                <div key={`${module.name}-${index}`} className="rounded-3xl border border-black/10 bg-white/55 p-4">
+                  <p className="text-base font-medium text-slate-900">{module.name}</p>
+                  <p className="mt-2 text-sm leading-7 text-slate-700">{module.purpose}</p>
+                  <p className="mt-2 text-sm leading-7 text-emerald-800">{module.why_it_matters}</p>
                 </div>
               ))}
             </div>
@@ -122,14 +122,14 @@ export function PaperWorkbench({
     if (activeTab === "experiments") {
       return (
         <div className="grid gap-4">
-          <OverviewCard eyebrow="实验结论" title="实验到底在证明什么">
+          <OverviewCard eyebrow="实验结论" title="实验证明了什么">
             <div className="space-y-4">
               {overview.main_experiments.map((item, index) => (
-                <div key={`${item.claim}-${index}`} className="rounded-3xl border border-white/10 bg-white/5 p-4">
-                  <p className="text-white">{item.claim}</p>
-                  <p className="mt-2 text-sm leading-7 text-mist">{item.evidence}</p>
+                <div key={`${item.claim}-${index}`} className="rounded-3xl border border-black/10 bg-white/55 p-4">
+                  <p className="text-slate-900">{item.claim}</p>
+                  <p className="mt-2 text-sm leading-7 text-slate-700">{item.evidence}</p>
                   {item.what_it_proves ? (
-                    <p className="mt-2 text-sm leading-7 text-brand">它证明了：{item.what_it_proves}</p>
+                    <p className="mt-2 text-sm leading-7 text-emerald-800">它证明了：{item.what_it_proves}</p>
                   ) : null}
                 </div>
               ))}
@@ -149,25 +149,25 @@ export function PaperWorkbench({
     if (activeTab === "reading") {
       return (
         <div className="grid gap-4">
-          <OverviewCard eyebrow="推荐阅读" title="下一步应该读什么">
+          <OverviewCard eyebrow="推荐阅读" title="下一步">
             <div className="space-y-4">
               {overview.recommended_readings.map((item, index) => (
-                <div key={`${item.title}-${index}`} className="rounded-3xl border border-white/10 bg-white/5 p-4">
-                  <p className="text-white">{item.title}</p>
-                  <p className="mt-2 text-sm leading-7 text-mist">{item.reason}</p>
-                  <p className="mt-2 text-xs text-brand">
-                    {item.difficulty_level} · 建议优先看 {item.suggested_section}
+                <div key={`${item.title}-${index}`} className="rounded-3xl border border-black/10 bg-white/55 p-4">
+                  <p className="text-slate-900">{item.title}</p>
+                  <p className="mt-2 text-sm leading-7 text-slate-700">{item.reason}</p>
+                  <p className="mt-2 text-xs text-emerald-800">
+                    {item.difficulty_level} · {item.suggested_section}
                   </p>
                 </div>
               ))}
             </div>
           </OverviewCard>
-          <OverviewCard eyebrow="前置知识" title="建议先补什么">
+          <OverviewCard eyebrow="前置知识" title="先补这些">
             <div className="space-y-4">
               {overview.prerequisite_knowledge.map((item, index) => (
-                <div key={`${item.topic}-${index}`} className="rounded-3xl border border-white/10 bg-white/5 p-4">
-                  <p className="text-white">{item.topic}</p>
-                  <p className="mt-2 text-sm leading-7 text-mist">{item.reason}</p>
+                <div key={`${item.topic}-${index}`} className="rounded-3xl border border-black/10 bg-white/55 p-4">
+                  <p className="text-slate-900">{item.topic}</p>
+                  <p className="mt-2 text-sm leading-7 text-slate-700">{item.reason}</p>
                 </div>
               ))}
             </div>
@@ -186,7 +186,7 @@ export function PaperWorkbench({
   return (
     <div className="grid gap-4 xl:grid-cols-[220px_minmax(0,1fr)]">
       <nav className="glass-panel p-5">
-        <ul className="space-y-2 text-sm text-mist">
+        <ul className="space-y-2 text-sm text-slate-700">
           {tabs.map((tab) => (
             <li key={tab.id}>
               <button
@@ -194,8 +194,8 @@ export function PaperWorkbench({
                 onClick={() => setActiveTab(tab.id)}
                 className={`w-full rounded-2xl px-4 py-3 text-left transition ${
                   activeTab === tab.id
-                    ? "bg-white/10 text-white"
-                    : "text-mist hover:bg-white/5 hover:text-white"
+                    ? "bg-brand/10 text-slate-900"
+                    : "text-slate-700 hover:bg-white/55 hover:text-slate-900"
                 }`}
               >
                 {tab.label}

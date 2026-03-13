@@ -61,18 +61,17 @@ export function UploadPanel() {
   }, [router, state]);
 
   return (
-    <div className="rounded-3xl border border-white/10 bg-black/20 p-5">
+    <div className="rounded-3xl border border-black/10 bg-white/55 p-5">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <p className="text-sm font-medium text-white">上传新论文</p>
-          <p className="mt-1 text-sm text-mist">选择 PDF 开始解析。</p>
+          <p className="text-sm font-medium text-slate-900">上传新论文</p>
         </div>
       </div>
       <input
         type="file"
         accept="application/pdf"
         onChange={(event) => setFile(event.target.files?.[0] ?? null)}
-        className="mt-4 block w-full text-sm text-mist file:mr-4 file:rounded-full file:border-0 file:bg-brand file:px-4 file:py-2 file:text-sm file:font-medium file:text-black"
+        className="mt-4 block w-full text-sm text-slate-700 file:mr-4 file:rounded-full file:border-0 file:bg-brand file:px-4 file:py-2 file:text-sm file:font-medium file:text-slate-900"
       />
       <button
         type="button"
@@ -107,12 +106,12 @@ export function UploadPanel() {
             }
           })
         }
-        className="mt-4 rounded-full bg-brand px-4 py-2 text-sm font-medium text-black disabled:cursor-not-allowed disabled:opacity-40"
+        className="mt-4 rounded-full bg-brand px-4 py-2 text-sm font-medium text-slate-900 disabled:cursor-not-allowed disabled:opacity-40"
       >
         {isPending ? "上传中..." : "开始解析"}
       </button>
-      <div className="mt-4 text-sm text-mist">
-        {state.status === "idle" ? "选择 PDF 后开始解析。"
+      <div className="mt-4 text-sm text-slate-700">
+        {state.status === "idle" ? "等待收录。"
           : null}
         {state.status === "uploading" ? "正在上传..."
           : null}

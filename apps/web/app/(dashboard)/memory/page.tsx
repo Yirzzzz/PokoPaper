@@ -12,8 +12,8 @@ export default async function MemoryPage() {
       {paperMemory ? (
         <MemoryPanel overview={overview} paperMemory={paperMemory} />
       ) : (
-        <section className="glass-panel p-6 text-sm text-mist">
-          还没有阅读记忆。上传并阅读第一篇论文后，这里会出现你的进度、卡点和学习路径。
+        <section className="glass-panel p-6 text-sm text-slate-700">
+          还没有记录。
         </section>
       )}
     </AppShell>

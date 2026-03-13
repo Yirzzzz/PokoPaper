@@ -1,5 +1,5 @@
 import { AppShell } from "@/components/layout/app-shell";
-import { PaperLibraryManager } from "@/features/library/paper-library-manager";
+import Link from "next/link";
 import { fetchMemoryOverview, fetchPapers } from "@/lib/api/client";
 import { UploadPanel } from "@/features/upload/upload-panel";
 
@@ -12,18 +12,13 @@ export default async function HomePage() {
         <section className="glass-panel bg-hero-grid p-8 shadow-glow">
           <div className="flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
             <div>
-              <p className="text-xs uppercase tracking-[0.3em] text-brand">图鉴研究所</p>
-              <h2 className="mt-3 max-w-3xl text-4xl font-semibold text-white">
-                你的论文库
-              </h2>
-              <p className="mt-4 max-w-2xl text-base leading-8 text-mist">
-                上传、整理并继续阅读你关心的论文。
-              </p>
+              <p className="text-xs uppercase tracking-[0.3em] text-brand">Research Lab</p>
+              <h2 className="mt-3 max-w-3xl text-4xl font-semibold text-slate-900">图鉴研究所</h2>
             </div>
-            <div className="flex flex-wrap gap-3 text-sm text-mist">
-              <span className="rounded-full border border-white/10 bg-white/5 px-4 py-2">图鉴：论文库</span>
-              <span className="rounded-full border border-white/10 bg-white/5 px-4 py-2">徽章：阅读进度</span>
-              <span className="rounded-full border border-white/10 bg-white/5 px-4 py-2">进化链：推荐阅读路径</span>
+            <div className="flex flex-wrap gap-3 text-sm text-slate-700">
+              <span className="rounded-full border border-black/10 bg-white/60 px-4 py-2">151 图鉴</span>
+              <span className="rounded-full border border-black/10 bg-white/60 px-4 py-2">像素卡</span>
+              <span className="rounded-full border border-black/10 bg-white/60 px-4 py-2">训练线</span>
             </div>
           </div>
         </section>
@@ -34,26 +29,26 @@ export default async function HomePage() {
               <p className="text-xs uppercase tracking-[0.24em] text-ember">阅读徽章</p>
               <div className="mt-4 flex items-end justify-between gap-4">
                 <div>
-                  <p className="text-5xl font-semibold text-white">{memory.read_papers}</p>
-                  <p className="mt-2 text-sm text-mist">累计已读论文</p>
+                  <p className="text-5xl font-semibold text-slate-900">{memory.read_papers}</p>
+                  <p className="mt-2 text-sm text-slate-700">已读论文</p>
                 </div>
-                <div className="rounded-3xl border border-white/10 bg-white/5 px-4 py-3 text-right">
+                <div className="rounded-3xl border border-black/10 bg-white/55 px-4 py-3 text-right">
                   <p className="text-xs uppercase tracking-[0.24em] text-brand">活跃主题</p>
-                  <p className="mt-2 text-sm text-white">{memory.active_topics.length} 个方向</p>
+                  <p className="mt-2 text-sm font-medium text-slate-900">{memory.active_topics.length} 个方向</p>
                 </div>
               </div>
             </section>
 
             <section className="glass-panel p-6">
               <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs uppercase tracking-[0.24em] text-brand">建议继续阅读</p>
-                <h3 className="mt-2 text-xl font-semibold text-white">研究方向</h3>
-              </div>
+                <div>
+                  <p className="text-xs uppercase tracking-[0.24em] text-brand">方向</p>
+                  <h3 className="mt-2 text-xl font-semibold text-slate-900">属性</h3>
+                </div>
               </div>
               <div className="mt-4 flex flex-wrap gap-2">
                 {memory.active_topics.map((topic) => (
-                  <span key={topic} className="rounded-full border border-white/10 px-3 py-2 text-sm text-mist">
+                  <span key={topic} className="rounded-full border border-black/10 bg-white/60 px-3 py-2 text-sm font-medium text-slate-800">
                     {topic}
                   </span>
                 ))}
@@ -63,8 +58,8 @@ export default async function HomePage() {
 
           <div className="space-y-4">
             <section className="glass-panel p-6">
-              <p className="text-xs uppercase tracking-[0.24em] text-brand">上传入口</p>
-              <h3 className="mt-2 text-xl font-semibold text-white">上传论文</h3>
+              <p className="text-xs uppercase tracking-[0.24em] text-brand">收录</p>
+              <h3 className="mt-2 text-xl font-semibold text-slate-900">上传论文</h3>
               <div className="mt-5">
                 <UploadPanel />
               </div>
@@ -72,13 +67,19 @@ export default async function HomePage() {
           </div>
 
           <section className="glass-panel p-6">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
               <div>
                 <p className="text-xs uppercase tracking-[0.24em] text-brand">论文图鉴</p>
-                <h3 className="mt-2 text-xl font-semibold text-white">最近加入的论文</h3>
+                <h3 className="mt-2 text-xl font-semibold text-slate-900">前往 Kanto Paper Dex</h3>
+                <p className="mt-3 text-sm font-medium text-slate-800">已收录 {papers.length} 篇</p>
               </div>
+              <Link
+                href="/dex"
+                className="inline-flex rounded-full border border-black/10 bg-white/60 px-5 py-3 text-sm font-medium text-slate-900 transition hover:bg-white/80"
+              >
+                打开论文图鉴
+              </Link>
             </div>
-            <PaperLibraryManager papers={papers} />
           </section>
         </section>
       </div>

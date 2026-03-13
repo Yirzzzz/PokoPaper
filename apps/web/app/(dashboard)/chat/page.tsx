@@ -10,8 +10,8 @@ export default async function ChatPage() {
       {paper ? (
         <ChatPanel paperId={paper.id} />
       ) : (
-        <section className="glass-panel p-6 text-sm text-mist">
-          还没有可聊天的论文。请先在首页上传 PDF。
+        <section className="glass-panel p-6 text-sm text-slate-700">
+          先收录一篇论文。
         </section>
       )}
     </AppShell>
