@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import ReactMarkdown from "react-markdown";
 import rehypeKatex from "rehype-katex";
 import remarkMath from "remark-math";
@@ -9,32 +9,45 @@ import {
   askQuestion,
   fetchChatMessages,
   fetchChatModels,
-  getOrCreateChatSession,
+  getOrCreatePaperConversation,
 } from "@/lib/api/client";
 import { useAppStore } from "@/store/app-store";
 import type { ChatHistoryMessage, ChatModelOption } from "@/types";
 
 type ChatPanelProps = {
-  paperId: string;
+  paperId?: string | null;
   initialQuestion?: string;
+  chatKey: string;
+  conversationId?: string | null;
+  conversationType?: "paper_chat" | "global_chat";
 };
 
-export function ChatPanel({ paperId, initialQuestion = "这篇论文主要做了什么？" }: ChatPanelProps) {
+export function ChatPanel({
+  paperId,
+  initialQuestion,
+  chatKey,
+  conversationId,
+  conversationType = "paper_chat",
+}: ChatPanelProps) {
   const [models, setModels] = useState<ChatModelOption[]>([]);
   const [isPending, startTransition] = useTransition();
+  const messagesContainerRef = useRef<HTMLDivElement | null>(null);
+  const bottomAnchorRef = useRef<HTMLDivElement | null>(null);
+  const resolvedInitialQuestion =
+    initialQuestion ?? (conversationType === "global_chat" ? "" : "这篇论文主要做了什么？");
   const {
-    initializePaperChat,
-    paperChats,
-    setSessionId,
+    initializeChatState,
+    chatStates,
+    setConversationId,
     hydrateChatHistory,
     setDraftQuestion,
     setSelectedModel,
     setEnableThinking,
     appendChatTurn,
   } = useAppStore();
-  const chatState = paperChats[paperId] ?? {
-    sessionId: null,
-    draftQuestion: initialQuestion,
+  const chatState = chatStates[chatKey] ?? {
+    conversationId: null,
+    draftQuestion: resolvedInitialQuestion,
     selectedModel: "",
     enableThinking: false,
     turns: [],
@@ -43,29 +56,53 @@ export function ChatPanel({ paperId, initialQuestion = "这篇论文主要做了
   };
 
   useEffect(() => {
-    initializePaperChat(paperId, initialQuestion);
-  }, [initializePaperChat, initialQuestion, paperId]);
+    initializeChatState(chatKey, resolvedInitialQuestion);
+  }, [chatKey, initializeChatState, resolvedInitialQuestion]);
+
+  useEffect(() => {
+    const container = messagesContainerRef.current;
+    if (!container) return;
+    container.scrollTop = container.scrollHeight;
+    bottomAnchorRef.current?.scrollIntoView({ block: "end" });
+  }, [chatState.historyMessages.length, chatState.turns.length, chatKey]);
 
   useEffect(() => {
     let active = true;
-    void Promise.all([fetchChatModels(), getOrCreateChatSession(paperId)]).then(async ([items, session]) => {
+    const conversationPromise =
+      conversationType === "paper_chat" && paperId ? getOrCreatePaperConversation(paperId) : Promise.resolve(null);
+    void Promise.all([fetchChatModels(), conversationPromise]).then(async ([items, conversation]) => {
       if (!active) return;
       const enabled = items.filter((item) => item.enabled);
       setModels(enabled);
       if (!chatState.selectedModel) {
-        setSelectedModel(paperId, enabled[0]?.id ?? "");
+        setSelectedModel(chatKey, enabled[0]?.id ?? "");
       }
-      setSessionId(paperId, session.session_id);
-      if (!chatState.historyLoaded) {
-        const messages = await fetchChatMessages(session.session_id);
+      const resolvedConversationId = conversationId ?? conversation?.conversation_id ?? null;
+      if (!resolvedConversationId) {
+        return;
+      }
+      setConversationId(chatKey, resolvedConversationId);
+      if (!chatState.historyLoaded || chatState.conversationId !== resolvedConversationId) {
+        const messages = await fetchChatMessages(resolvedConversationId);
         if (!active) return;
-        hydrateChatHistory(paperId, messages);
+        hydrateChatHistory(chatKey, messages);
       }
     });
     return () => {
       active = false;
     };
-  }, [chatState.historyLoaded, chatState.selectedModel, hydrateChatHistory, paperId, setSelectedModel, setSessionId]);
+  }, [
+    chatKey,
+    chatState.historyLoaded,
+    chatState.conversationId,
+    conversationType,
+    conversationId,
+    hydrateChatHistory,
+    paperId,
+    setConversationId,
+    setSelectedModel,
+    chatState.selectedModel,
+  ]);
 
   return (
     <section className="glass-panel flex min-h-[calc(100dvh-12rem)] flex-col overflow-hidden p-0 sm:min-h-[calc(100dvh-11rem)] xl:h-[calc(100dvh-8rem)] xl:min-h-[720px]">
@@ -78,7 +115,7 @@ export function ChatPanel({ paperId, initialQuestion = "这篇论文主要做了
           <label className="mb-2 block text-xs uppercase tracking-[0.24em] text-slate-700">可选模型</label>
           <select
             value={chatState.selectedModel}
-            onChange={(event) => setSelectedModel(paperId, event.target.value)}
+            onChange={(event) => setSelectedModel(chatKey, event.target.value)}
             className="w-full rounded-2xl border border-black/10 bg-white/70 px-4 py-3 text-sm text-slate-900 outline-none"
           >
             {models.length === 0 ? <option value="">当前没有可用模型</option> : null}
@@ -92,7 +129,7 @@ export function ChatPanel({ paperId, initialQuestion = "这篇论文主要做了
             <input
               type="checkbox"
               checked={chatState.enableThinking}
-              onChange={(event) => setEnableThinking(paperId, event.target.checked)}
+              onChange={(event) => setEnableThinking(chatKey, event.target.checked)}
               className="h-4 w-4 rounded border-black/20 bg-white/70"
             />
             开启 thinking 模式
@@ -100,7 +137,7 @@ export function ChatPanel({ paperId, initialQuestion = "这篇论文主要做了
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 md:px-6 md:py-5">
+      <div ref={messagesContainerRef} className="min-h-0 flex-1 overflow-y-auto px-4 py-4 md:px-6 md:py-5">
         {chatState.historyMessages.length > 0 || chatState.turns.length > 0 ? (
           <div className="space-y-5">
           {chatState.historyMessages.map((message: ChatHistoryMessage, index) => (
@@ -157,7 +194,7 @@ export function ChatPanel({ paperId, initialQuestion = "这篇论文主要做了
                         <button
                           key={`${turn.id}-${item}`}
                           type="button"
-                          onClick={() => setDraftQuestion(paperId, item)}
+                          onClick={() => setDraftQuestion(chatKey, item)}
                           className="rounded-full border border-black/10 bg-white/65 px-3 py-2 text-xs text-slate-700"
                         >
                           {item}
@@ -169,6 +206,7 @@ export function ChatPanel({ paperId, initialQuestion = "这篇论文主要做了
               </div>
             );
           })}
+          <div ref={bottomAnchorRef} />
           </div>
         ) : (
           <div className="flex h-full items-center justify-center">
@@ -183,7 +221,7 @@ export function ChatPanel({ paperId, initialQuestion = "这篇论文主要做了
         <div className="rounded-[24px] border border-black/10 bg-white/70 p-3 md:rounded-[28px]">
           <textarea
             value={chatState.draftQuestion}
-            onChange={(event) => setDraftQuestion(paperId, event.target.value)}
+            onChange={(event) => setDraftQuestion(chatKey, event.target.value)}
             className="h-24 max-h-40 w-full resize-y bg-transparent p-2 text-sm text-slate-900 outline-none md:h-28"
             placeholder="输入你的问题..."
           />
@@ -197,8 +235,9 @@ export function ChatPanel({ paperId, initialQuestion = "这篇论文主要做了
                     chatState.draftQuestion,
                     chatState.selectedModel || undefined,
                     chatState.enableThinking,
+                    chatState.conversationId ?? undefined,
                   );
-                  appendChatTurn(paperId, {
+                  appendChatTurn(chatKey, {
                     id: `${result.message_id}-${Date.now()}`,
                     question: chatState.draftQuestion,
                     response: result,

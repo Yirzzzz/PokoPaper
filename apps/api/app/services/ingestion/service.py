@@ -15,6 +15,8 @@ from app.services.ingestion.parser import (
     split_sections,
 )
 from app.services.llm.service import LLMService
+from app.services.memory.service import MemoryService
+from app.services.paper_entity_memory import PaperEntityMemoryService
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +25,8 @@ class IngestionService:
     def __init__(self) -> None:
         self.repo = get_repository()
         self.llm_service = LLMService()
+        self.memory_service = MemoryService()
+        self.paper_entity_memory_service = PaperEntityMemoryService()
 
     async def upload_and_process(self, filename: str, content: bytes) -> dict:
         now = datetime.now(UTC).isoformat()
@@ -63,7 +67,7 @@ class IngestionService:
         self.repo.update_job(job_id, {"stage": "parsing", "progress": 35, "updated_at": now})
         pages = extract_text_by_page(file_path)
         full_text = "\n\n".join(page["text"] for page in pages if page["text"])
-        title = infer_title(pages, fallback=Path(filename).stem)
+        title = infer_title(pages, fallback=Path(filename).stem, file_path=file_path)
         abstract = infer_abstract(full_text)
         sections = split_sections(pages)
         chunks = build_chunks(sections)
@@ -147,16 +151,25 @@ class IngestionService:
         self.repo.upsert_paper(paper)
         self.repo.save_structure(paper_id, structure)
         self.repo.save_overview(paper_id, overview)
-        self.repo.save_memory(
-            paper_id,
-            {
-                "paper_id": paper_id,
-                "progress_status": "new",
-                "progress_percent": 0,
-                "last_read_section": structure["sections"][0]["section_title"] if structure["sections"] else "Unknown",
-                "stuck_points": [],
-                "key_questions": [],
-            },
+        self.paper_entity_memory_service.upsert_from_overview(paper_id=paper_id, overview=overview)
+        paper_memory = {
+            "scope_type": "paper",
+            "scope_id": paper_id,
+            "paper_id": paper_id,
+            "progress_status": "new",
+            "progress_percent": 0,
+            "last_read_section": structure["sections"][0]["section_title"] if structure["sections"] else "Unknown",
+            "stuck_points": [],
+            "key_questions": [],
+        }
+        if hasattr(self.repo, "save_scoped_memory"):
+            self.repo.save_scoped_memory(f"paper:{paper_id}", paper_memory)
+        else:
+            self.repo.save_memory(paper_id, paper_memory)
+        self.memory_service.initialize_paper_memory_from_overview(paper_id=paper_id, overview=overview)
+        self.memory_service.update_user_memory_from_ingestion(
+            paper_id=paper_id,
+            overview=overview,
         )
         self.repo.update_job(
             job_id,

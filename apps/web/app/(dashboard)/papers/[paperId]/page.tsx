@@ -1,6 +1,7 @@
 import { AppShell } from "@/components/layout/app-shell";
+import { ActivePaperSync } from "@/components/paper/active-paper-sync";
 import { PaperWorkbench } from "@/components/paper/paper-workbench";
-import { fetchMemoryOverview, fetchOverview, fetchPaperMemory, fetchPapers } from "@/lib/api/client";
+import { fetchOverview, fetchPapers } from "@/lib/api/client";
 import {
   formatDexNumber,
   getCaptureStage,
@@ -15,10 +16,8 @@ export default async function PaperWorkbenchPage({
   params: Promise<{ paperId: string }>;
 }) {
   const { paperId } = await params;
-  const [overview, paperMemory, memoryOverview, papers] = await Promise.all([
+  const [overview, papers] = await Promise.all([
     fetchOverview(paperId),
-    fetchPaperMemory(paperId),
-    fetchMemoryOverview(),
     fetchPapers(),
   ]);
   const paper = papers.find((item) => item.id === paperId);
@@ -32,6 +31,7 @@ export default async function PaperWorkbenchPage({
       hints={overview.prerequisite_knowledge.map((item) => `${item.topic}: ${item.reason}`)}
       showContextPanel={false}
     >
+      <ActivePaperSync paperId={paperId} />
       <div className="grid gap-4">
         <section className="pokedex-shell rounded-[2.5rem] border border-white/10 p-5 text-white">
           <div className="rounded-[2rem] border border-black/20 bg-black/15 p-5">
@@ -74,10 +74,7 @@ export default async function PaperWorkbenchPage({
                 <p className="mt-4 max-w-3xl text-sm leading-8 text-slate-700">{overview.tldr}</p>
                 <div className="mt-5 flex flex-wrap gap-2">
                   <span className="rounded-full border border-black/10 bg-white/55 px-3 py-2 text-sm text-slate-700">
-                    阅读进度 {paperMemory.progress_percent}%
-                  </span>
-                  <span className="rounded-full border border-black/10 bg-white/55 px-3 py-2 text-sm text-slate-700">
-                    上次读到 {paperMemory.last_read_section}
+                    当前状态 {captureStage}
                   </span>
                 </div>
               </div>
@@ -87,8 +84,6 @@ export default async function PaperWorkbenchPage({
         <PaperWorkbench
           paperId={paperId}
           overview={overview}
-          paperMemory={paperMemory}
-          memoryOverview={memoryOverview}
         />
       </div>
     </AppShell>

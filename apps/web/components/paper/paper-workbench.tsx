@@ -5,8 +5,7 @@ import { useMemo, useState } from "react";
 import { ChatPanel } from "@/components/chat/chat-panel";
 import { FormulaBlock } from "@/components/paper/formula-block";
 import { OverviewCard } from "@/components/paper/overview-card";
-import { MemoryPanel } from "@/components/memory/memory-panel";
-import type { Overview, ReadingMemory, MemoryOverview } from "@/types";
+import type { Overview } from "@/types";
 
 type TabId =
   | "overview"
@@ -14,14 +13,11 @@ type TabId =
   | "method"
   | "experiments"
   | "chat"
-  | "reading"
-  | "memory";
+  | "reading";
 
 type PaperWorkbenchProps = {
   paperId: string;
   overview: Overview;
-  paperMemory: ReadingMemory;
-  memoryOverview: MemoryOverview;
 };
 
 const tabs: Array<{ id: TabId; label: string }> = [
@@ -31,14 +27,11 @@ const tabs: Array<{ id: TabId; label: string }> = [
   { id: "experiments", label: "对战" },
   { id: "chat", label: "追问" },
   { id: "reading", label: "进化路线" },
-  { id: "memory", label: "档案" },
 ];
 
 export function PaperWorkbench({
   paperId,
   overview,
-  paperMemory,
-  memoryOverview,
 }: PaperWorkbenchProps) {
   const [activeTab, setActiveTab] = useState<TabId>("overview");
 
@@ -176,12 +169,8 @@ export function PaperWorkbench({
       );
     }
 
-    if (activeTab === "memory") {
-      return <MemoryPanel overview={memoryOverview} paperMemory={paperMemory} />;
-    }
-
-    return <ChatPanel paperId={paperId} />;
-  }, [activeTab, memoryOverview, overview, paperId, paperMemory]);
+    return <ChatPanel paperId={paperId} chatKey={`paper:${paperId}`} />;
+  }, [activeTab, overview, paperId]);
 
   return (
     <div className="grid gap-4 xl:grid-cols-[220px_minmax(0,1fr)]">

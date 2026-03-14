@@ -1,11 +1,19 @@
 import type {
+  ChatConversation,
   ChatHistoryMessage,
   ChatModelOption,
   ChatResponse,
+  MemoryItem,
+  MemoryItemListResponse,
   MemoryOverview,
   Overview,
   PaperCard,
+  PaperEntityMemoryCard,
+  PaperEntityMemoryListResponse,
   ReadingMemory,
+  SessionMemoryListResponse,
+  SessionMemoryView,
+  UserEntityMemory,
 } from "@/types";
 
 const API_BASE_URL =
@@ -65,18 +73,128 @@ export async function fetchPaperMemory(paperId: string) {
   return getJson<ReadingMemory>(`/memory/papers/${paperId}`);
 }
 
+export async function fetchUserEntityMemory() {
+  return getJson<UserEntityMemory>("/memory/user");
+}
+
+export async function fetchPaperEntityMemories() {
+  return getJson<PaperEntityMemoryListResponse>("/memory/paper-entities");
+}
+
+export async function fetchPaperEntityMemory(paperId: string) {
+  return getJson<PaperEntityMemoryCard>(`/memory/paper-entities/${paperId}`);
+}
+
+export async function fetchMemoryItems(params?: {
+  scope?: string;
+  paper_id?: string;
+  memory_type?: string;
+  enabled?: string;
+}) {
+  const query = new URLSearchParams();
+  if (params?.scope) query.set("scope", params.scope);
+  if (params?.paper_id) query.set("paper_id", params.paper_id);
+  if (params?.memory_type) query.set("memory_type", params.memory_type);
+  if (params?.enabled) query.set("enabled", params.enabled);
+  const suffix = query.toString() ? `?${query.toString()}` : "";
+  return getJson<MemoryItemListResponse>(`/memory/items${suffix}`);
+}
+
+export async function fetchMemoryItem(memoryId: string) {
+  return getJson<MemoryItem>(`/memory/items/${memoryId}`);
+}
+
+export async function setMemoryItemEnabled(memoryId: string, enabled: boolean) {
+  const response = await fetch(
+    `${API_BASE_URL}/memory/items/${memoryId}/${enabled ? "enable" : "disable"}`,
+    { method: "POST" },
+  );
+  if (!response.ok) {
+    throw new Error("Memory toggle failed");
+  }
+  return response.json() as Promise<MemoryItem>;
+}
+
+export async function deleteMemoryItem(memoryId: string) {
+  const response = await fetch(`${API_BASE_URL}/memory/items/${memoryId}`, {
+    method: "DELETE",
+  });
+  if (!response.ok) {
+    throw new Error("Delete memory failed");
+  }
+}
+
+export async function resetMemory(payload: {
+  scope?: string | null;
+  paper_id?: string | null;
+  memory_type?: string | null;
+}) {
+  const response = await fetch(`${API_BASE_URL}/memory/reset`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    throw new Error("Reset memory failed");
+  }
+  return response.json() as Promise<{ deleted: number }>;
+}
+
+export async function fetchSessionMemories() {
+  return getJson<SessionMemoryListResponse>("/memory/session-memories");
+}
+
+export async function fetchSessionMemory(conversationId: string) {
+  return getJson<SessionMemoryView>(`/memory/session-memories/${conversationId}`);
+}
+
+export async function clearSessionMemory(conversationId: string) {
+  const response = await fetch(`${API_BASE_URL}/memory/session-memories/${conversationId}/clear`, {
+    method: "POST",
+  });
+  if (!response.ok) {
+    throw new Error("Clear session memory failed");
+  }
+  return response.json() as Promise<SessionMemoryView>;
+}
+
 export async function fetchChatModels() {
   return getJson<ChatModelOption[]>("/chat/models");
 }
 
-export async function getOrCreateChatSession(paperId: string) {
-  return getJson<{ session_id: string; paper_id: string; title: string }>(
+export async function getOrCreatePaperConversation(paperId: string) {
+  return getJson<ChatConversation>(
     `/chat/sessions/by-paper/${paperId}`,
   );
 }
 
-export async function fetchChatMessages(sessionId: string) {
-  return getJson<ChatHistoryMessage[]>(`/chat/sessions/${sessionId}/messages`);
+export async function fetchGlobalConversations() {
+  return getJson<{ conversations: ChatConversation[] }>("/chat/conversations/global");
+}
+
+export async function createGlobalConversation(title?: string) {
+  const response = await fetch(`${API_BASE_URL}/chat/conversations/global`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ title }),
+  });
+  if (!response.ok) {
+    throw new Error("Create global conversation failed");
+  }
+  return response.json() as Promise<ChatConversation>;
+}
+
+export async function deleteGlobalConversation(conversationId: string) {
+  const response = await fetch(`${API_BASE_URL}/chat/conversations/global/${conversationId}`, {
+    method: "DELETE",
+  });
+  if (!response.ok) {
+    throw new Error("Delete global conversation failed");
+  }
+}
+
+export async function fetchChatMessages(conversationId: string) {
+  return getJson<ChatHistoryMessage[]>(`/chat/sessions/${conversationId}/messages`);
 }
 
 export async function fetchIngestionJob(jobId: string) {
@@ -90,15 +208,17 @@ export async function fetchIngestionJob(jobId: string) {
 }
 
 export async function askQuestion(
-  paperId: string,
+  paperId: string | null | undefined,
   question: string,
   selectedModel?: string,
   enableThinking?: boolean,
+  conversationId?: string,
 ) {
-  const session = await getOrCreateChatSession(paperId);
+  const resolvedConversationId =
+    conversationId ?? (paperId ? await getOrCreatePaperConversation(paperId) : await createGlobalConversation()).conversation_id;
 
   const response = await fetch(
-    `${API_BASE_URL}/chat/sessions/${session.session_id}/messages`,
+    `${API_BASE_URL}/chat/sessions/${resolvedConversationId}/messages`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },

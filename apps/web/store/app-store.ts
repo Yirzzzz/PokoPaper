@@ -2,7 +2,7 @@
 
 import { create } from "zustand";
 
-import type { ChatHistoryMessage, ChatResponse } from "@/types";
+import type { ChatConversation, ChatHistoryMessage, ChatResponse } from "@/types";
 
 type ChatTurn = {
   id: string;
@@ -10,8 +10,8 @@ type ChatTurn = {
   response: ChatResponse;
 };
 
-type PaperChatState = {
-  sessionId: string | null;
+type ChatState = {
+  conversationId: string | null;
   draftQuestion: string;
   selectedModel: string;
   enableThinking: boolean;
@@ -22,144 +22,166 @@ type PaperChatState = {
 
 type AppState = {
   activePaperId: string;
-  paperChats: Record<string, PaperChatState>;
+  activeGlobalConversationId: string | null;
+  globalConversations: ChatConversation[];
+  chatStates: Record<string, ChatState>;
   setActivePaperId: (paperId: string) => void;
-  initializePaperChat: (paperId: string, initialQuestion: string) => void;
-  setSessionId: (paperId: string, sessionId: string) => void;
-  hydrateChatHistory: (paperId: string, messages: ChatHistoryMessage[]) => void;
-  setDraftQuestion: (paperId: string, question: string) => void;
-  setSelectedModel: (paperId: string, modelId: string) => void;
-  setEnableThinking: (paperId: string, enabled: boolean) => void;
-  appendChatTurn: (paperId: string, turn: ChatTurn) => void;
+  setActiveGlobalConversationId: (conversationId: string | null) => void;
+  setGlobalConversations: (conversations: ChatConversation[]) => void;
+  upsertGlobalConversation: (conversation: ChatConversation) => void;
+  removeGlobalConversation: (conversationId: string) => void;
+  initializeChatState: (chatKey: string, initialQuestion: string) => void;
+  setConversationId: (chatKey: string, conversationId: string) => void;
+  hydrateChatHistory: (chatKey: string, messages: ChatHistoryMessage[]) => void;
+  setDraftQuestion: (chatKey: string, question: string) => void;
+  setSelectedModel: (chatKey: string, modelId: string) => void;
+  setEnableThinking: (chatKey: string, enabled: boolean) => void;
+  appendChatTurn: (chatKey: string, turn: ChatTurn) => void;
 };
 
+function createDefaultChatState(initialQuestion: string): ChatState {
+  return {
+    conversationId: null,
+    draftQuestion: initialQuestion,
+    selectedModel: "",
+    enableThinking: false,
+    turns: [],
+    historyLoaded: false,
+    historyMessages: [],
+  };
+}
+
+function getStoredValue(key: string, fallback: string | null): string | null {
+  if (typeof window === "undefined") {
+    return fallback;
+  }
+  return window.localStorage.getItem(key) ?? fallback;
+}
+
 export const useAppStore = create<AppState>((set) => ({
-  activePaperId: "paper-demo-001",
-  paperChats: {},
-  setActivePaperId: (activePaperId) => set({ activePaperId }),
-  initializePaperChat: (paperId, initialQuestion) =>
+  activePaperId: getStoredValue("pokomon-active-paper-id", "paper-demo-001") ?? "paper-demo-001",
+  activeGlobalConversationId: getStoredValue("pokomon-active-global-conversation-id", null),
+  globalConversations: [],
+  chatStates: {},
+  setActivePaperId: (activePaperId) => {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("pokomon-active-paper-id", activePaperId);
+    }
+    set({ activePaperId });
+  },
+  setActiveGlobalConversationId: (activeGlobalConversationId) => {
+    if (typeof window !== "undefined") {
+      if (activeGlobalConversationId) {
+        window.localStorage.setItem("pokomon-active-global-conversation-id", activeGlobalConversationId);
+      } else {
+        window.localStorage.removeItem("pokomon-active-global-conversation-id");
+      }
+    }
+    set({ activeGlobalConversationId });
+  },
+  setGlobalConversations: (globalConversations) => set({ globalConversations }),
+  upsertGlobalConversation: (conversation) =>
+    set((state) => {
+      const remaining = state.globalConversations.filter(
+        (item) => item.conversation_id !== conversation.conversation_id,
+      );
+      return {
+        globalConversations: [conversation, ...remaining].sort(
+          (left, right) => right.updated_at.localeCompare(left.updated_at),
+        ),
+      };
+    }),
+  removeGlobalConversation: (conversationId) =>
+    set((state) => {
+      const globalConversations = state.globalConversations.filter(
+        (item) => item.conversation_id !== conversationId,
+      );
+      const nextActive =
+        state.activeGlobalConversationId === conversationId
+          ? globalConversations[0]?.conversation_id ?? null
+          : state.activeGlobalConversationId;
+      const { [conversationId]: _removed, ...remainingChatStates } = state.chatStates;
+      if (typeof window !== "undefined") {
+        if (nextActive) {
+          window.localStorage.setItem("pokomon-active-global-conversation-id", nextActive);
+        } else {
+          window.localStorage.removeItem("pokomon-active-global-conversation-id");
+        }
+      }
+      return {
+        globalConversations,
+        activeGlobalConversationId: nextActive,
+        chatStates: remainingChatStates,
+      };
+    }),
+  initializeChatState: (chatKey, initialQuestion) =>
     set((state) => ({
-      paperChats: state.paperChats[paperId]
-        ? state.paperChats
+      chatStates: state.chatStates[chatKey]
+        ? state.chatStates
         : {
-            ...state.paperChats,
-            [paperId]: {
-              sessionId: null,
-              draftQuestion: initialQuestion,
-              selectedModel: "",
-              enableThinking: false,
-              turns: [],
-              historyLoaded: false,
-              historyMessages: [],
-            },
+            ...state.chatStates,
+            [chatKey]: createDefaultChatState(initialQuestion),
           },
     })),
-  setSessionId: (paperId, sessionId) =>
+  setConversationId: (chatKey, conversationId) =>
     set((state) => ({
-      paperChats: {
-        ...state.paperChats,
-        [paperId]: {
-          ...(state.paperChats[paperId] ?? {
-            sessionId: null,
-            draftQuestion: "",
-            selectedModel: "",
-            enableThinking: false,
-            turns: [],
-            historyLoaded: false,
-            historyMessages: [],
-          }),
-          sessionId,
+      chatStates: {
+        ...state.chatStates,
+        [chatKey]: {
+          ...(state.chatStates[chatKey] ?? createDefaultChatState("")),
+          conversationId,
         },
       },
     })),
-  hydrateChatHistory: (paperId, messages) =>
+  hydrateChatHistory: (chatKey, messages) =>
     set((state) => ({
-      paperChats: {
-        ...state.paperChats,
-        [paperId]: {
-          ...(state.paperChats[paperId] ?? {
-            sessionId: null,
-            draftQuestion: "",
-            selectedModel: "",
-            enableThinking: false,
-            turns: [],
-            historyLoaded: false,
-            historyMessages: [],
-          }),
+      chatStates: {
+        ...state.chatStates,
+        [chatKey]: {
+          ...(state.chatStates[chatKey] ?? createDefaultChatState("")),
           historyLoaded: true,
           historyMessages: messages,
+          turns: [],
         },
       },
     })),
-  setDraftQuestion: (paperId, question) =>
+  setDraftQuestion: (chatKey, question) =>
     set((state) => ({
-      paperChats: {
-        ...state.paperChats,
-        [paperId]: {
-          ...(state.paperChats[paperId] ?? {
-            sessionId: null,
-            draftQuestion: "",
-            selectedModel: "",
-            enableThinking: false,
-            turns: [],
-            historyLoaded: false,
-            historyMessages: [],
-          }),
+      chatStates: {
+        ...state.chatStates,
+        [chatKey]: {
+          ...(state.chatStates[chatKey] ?? createDefaultChatState("")),
           draftQuestion: question,
         },
       },
     })),
-  setSelectedModel: (paperId, modelId) =>
+  setSelectedModel: (chatKey, modelId) =>
     set((state) => ({
-      paperChats: {
-        ...state.paperChats,
-        [paperId]: {
-          ...(state.paperChats[paperId] ?? {
-            sessionId: null,
-            draftQuestion: "",
-            selectedModel: "",
-            enableThinking: false,
-            turns: [],
-            historyLoaded: false,
-            historyMessages: [],
-          }),
+      chatStates: {
+        ...state.chatStates,
+        [chatKey]: {
+          ...(state.chatStates[chatKey] ?? createDefaultChatState("")),
           selectedModel: modelId,
         },
       },
     })),
-  setEnableThinking: (paperId, enabled) =>
+  setEnableThinking: (chatKey, enabled) =>
     set((state) => ({
-      paperChats: {
-        ...state.paperChats,
-        [paperId]: {
-          ...(state.paperChats[paperId] ?? {
-            sessionId: null,
-            draftQuestion: "",
-            selectedModel: "",
-            enableThinking: false,
-            turns: [],
-            historyLoaded: false,
-            historyMessages: [],
-          }),
+      chatStates: {
+        ...state.chatStates,
+        [chatKey]: {
+          ...(state.chatStates[chatKey] ?? createDefaultChatState("")),
           enableThinking: enabled,
         },
       },
     })),
-  appendChatTurn: (paperId, turn) =>
+  appendChatTurn: (chatKey, turn) =>
     set((state) => ({
-      paperChats: {
-        ...state.paperChats,
-        [paperId]: {
-          ...(state.paperChats[paperId] ?? {
-            sessionId: null,
-            draftQuestion: "",
-            selectedModel: "",
-            enableThinking: false,
-            turns: [],
-            historyLoaded: false,
-            historyMessages: [],
-          }),
-          turns: [...(state.paperChats[paperId]?.turns ?? []), turn],
+      chatStates: {
+        ...state.chatStates,
+        [chatKey]: {
+          ...(state.chatStates[chatKey] ?? createDefaultChatState("")),
+          turns: [...(state.chatStates[chatKey]?.turns ?? []), turn],
         },
       },
     })),

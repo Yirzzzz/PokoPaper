@@ -5,6 +5,8 @@ from uuid import uuid4
 
 from app.repositories.factory import get_repository
 from app.services.llm.service import LLMService
+from app.services.memory.service import MemoryService
+from app.services.short_term_memory import ShortTermMemoryService
 
 logger = logging.getLogger(__name__)
 
@@ -13,6 +15,8 @@ class RAGService:
     def __init__(self) -> None:
         self.repo = get_repository()
         self.llm_service = LLMService()
+        self.memory_service = MemoryService()
+        self.short_term_memory = ShortTermMemoryService()
 
     def get_overview(self, paper_id: str) -> dict:
         overview = self.repo.get_overview(paper_id)
@@ -24,11 +28,16 @@ class RAGService:
         self,
         paper_id: str,
         question: str,
+        conversation_id: str,
         selected_model: str | None = None,
-        memory: dict | None = None,
         enable_thinking: bool | None = None,
     ) -> dict:
         overview = self.get_overview(paper_id)
+        conversation_context = self.short_term_memory.build_context(
+            conversation_id=conversation_id,
+            current_question=question,
+        )
+        user_memory = self.memory_service.get_user_memory()
         chunks = overview.get("chunks", [])
         lower_question = question.lower()
         intent = self._infer_intent(lower_question)
@@ -51,7 +60,8 @@ class RAGService:
                 question=question,
                 overview=overview,
                 evidence_chunks=preferred,
-                memory=memory or {"preferred_explanation_style": "intuitive_then_formula"},
+                conversation_context=conversation_context,
+                user_memory=user_memory,
                 enable_thinking=enable_thinking,
             )
         logger.info(
@@ -62,6 +72,7 @@ class RAGService:
         )
         debug_info = self.llm_service.last_debug_info
         llm_succeeded = bool(llm_answer) and bool(debug_info) and debug_info.get("status") == "success"
+        followup_answer = None if llm_succeeded else self._build_short_term_followup_answer(question, conversation_context)
         background_tip = (
             "如果你对相关公式背景不熟，建议先补对应数学概念，再看这部分方法。"
             if intent == "formula"
@@ -70,6 +81,7 @@ class RAGService:
         return {
             "message_id": f"message-{uuid4().hex[:8]}",
             "answer_md": llm_answer
+            or followup_answer
             or (
                 self._build_fallback_answer(
                     question=question,
@@ -92,7 +104,7 @@ class RAGService:
             ],
             "suggested_followups": [
                 "这个 routing score 怎么计算？",
-                "实验里如何证明 memory 有用？",
+                "实验里如何证明这个设计有效？",
             ],
             "recommended_readings": [
                 {
@@ -108,6 +120,111 @@ class RAGService:
             "model_used": model_config["label"] if llm_succeeded and model_config else "heuristic-fallback",
             "debug_info": debug_info,
         }
+
+    def answer_global_question(
+        self,
+        question: str,
+        conversation_id: str,
+        selected_model: str | None = None,
+        enable_thinking: bool | None = None,
+    ) -> dict:
+        conversation_context = self.short_term_memory.build_context(
+            conversation_id=conversation_id,
+            current_question=question,
+        )
+        user_memory = self.memory_service.get_user_memory()
+        llm_answer = None
+        model_config = self.llm_service.get_model_config(selected_model)
+        if model_config is not None:
+            llm_answer = self.llm_service.generate_global_memory_answer(
+                selected_model=selected_model,
+                question=question,
+                conversation_context=conversation_context,
+                user_memory=user_memory,
+                enable_thinking=enable_thinking,
+            )
+        followup_answer = self._build_short_term_followup_answer(question, conversation_context)
+        answer_md = (
+            "这是一个未绑定具体论文的全局会话。你可以直接聊研究思路、实现方案或产品设计；如果要问某篇论文的细节，请进入那篇论文页继续追问。"
+        )
+
+        debug_info = self.llm_service.last_debug_info
+        llm_succeeded = bool(llm_answer) and bool(debug_info) and debug_info.get("status") == "success"
+        logger.info(
+            "chat.answer.global: model=%s source=%s",
+            model_config["model"] if model_config else "none",
+            "llm" if llm_succeeded else "heuristic_global",
+        )
+        return {
+            "message_id": f"message-{uuid4().hex[:8]}",
+            "answer_md": llm_answer or followup_answer or answer_md,
+            "answer_blocks": [
+                {
+                    "type": "global_chat",
+                    "content": "当前回答基于全局聊天上下文，不绑定具体论文和额外记忆检索。",
+                }
+            ],
+            "citations": [],
+            "inference_notes": [
+                "这是一个全局聊天回答；如需论文细节，请进入对应论文页。",
+            ],
+            "suggested_followups": [
+                "帮我梳理一下这个研究问题",
+                "我应该先看哪篇论文？",
+            ],
+            "recommended_readings": [],
+            "model_used": model_config["label"] if llm_succeeded and model_config else "global-chat",
+            "debug_info": debug_info
+            or {
+                "stage": "global_answer",
+                "status": "success",
+                "enable_thinking": enable_thinking,
+                "selected_model": selected_model,
+            },
+        }
+
+    @staticmethod
+    def _looks_like_followup_question(question: str) -> bool:
+        markers = [
+            "我刚刚问了什么问题",
+            "上一个问题是什么",
+            "刚才我们在说什么",
+            "你刚刚提到",
+            "前面那个问题",
+            "刚刚",
+            "上一个问题",
+        ]
+        return any(marker in question for marker in markers)
+
+    def _build_short_term_followup_answer(
+        self,
+        question: str,
+        conversation_context: dict | None,
+    ) -> str | None:
+        if not conversation_context or not self._looks_like_followup_question(question):
+            return None
+        last_question = conversation_context.get("last_user_question")
+        last_assistant_message = conversation_context.get("last_assistant_message")
+        rolling_summary = conversation_context.get("rolling_summary", "")
+        if "问了什么" in question or "上一个问题" in question or "前面那个问题" in question:
+            if last_question:
+                return f"你刚刚问的是：`{last_question}`"
+            return "当前这个会话里还没有更早的问题记录。"
+        if "刚才我们在说什么" in question:
+            if rolling_summary:
+                return f"刚才我们主要在说：{rolling_summary}"
+            if last_assistant_message:
+                return f"刚才我主要在讲：{last_assistant_message[:220]}"
+            if last_question:
+                return f"刚才我们围绕这个问题在继续：`{last_question}`"
+            return "当前这个会话里还没有可回顾的聊天历史。"
+        if "你刚刚提到" in question:
+            if last_assistant_message:
+                return f"我刚刚提到的内容主要是：{last_assistant_message[:240]}"
+            if rolling_summary:
+                return f"我刚刚提到的重点是：{rolling_summary}"
+            return "当前这个会话里还没有足够的上一轮回答可回顾。"
+        return None
 
     @staticmethod
     def _infer_intent(lower_question: str) -> str:

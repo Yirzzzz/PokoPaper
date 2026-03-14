@@ -99,26 +99,57 @@ def build_agent_answer_prompt(
     question: str,
     overview: dict,
     evidence_chunks: list[dict],
-    memory: dict,
+    conversation_context: dict | None = None,
+    user_memory: dict | None = None,
 ) -> str:
     evidence_text = "\n\n".join(
         f"[{chunk['section_title']} | p.{chunk['page_num']} | {chunk['chunk_type']}]\n{chunk['content'][:600]}"
         for chunk in evidence_chunks[:4]
     )
+    context = conversation_context or {}
+    profile = user_memory or {}
+    recent_messages_text = "\n".join(
+        f"- [{item.get('role')}] {item.get('content_md')}"
+        for item in context.get("recent_messages", [])
+    ) or "无"
+    recent_questions = context.get("recent_questions", [])
+    rolling_summary = context.get("rolling_summary", "")
+    user_memory_text = f"""
+已读论文：
+{profile.get("read_paper_ids", [])}
+
+最近主题：
+{profile.get("recent_topics", [])}
+
+仍不熟的概念：
+{profile.get("weak_concepts", [])}
+
+已掌握的概念：
+{profile.get("mastered_concepts", [])}
+
+偏好的解释风格：
+{profile.get("preferred_explanation_style", "intuitive_then_formula")}
+
+已确认的跨论文关联：
+{profile.get("cross_paper_links", [])}
+""".strip()
     return f"""
-你是一个论文陪读智能体。请根据“结构化论文分析 + 证据片段 + 用户阅读记忆”回答用户的当前问题。
+你是一个论文陪读智能体。请根据“结构化论文分析 + 证据片段”回答用户的当前问题。
 
 用户问题：
 {question}
 
-用户阅读记忆：
-{memory}
+当前会话最近上下文（可按需参考）：
+{recent_messages_text}
 
-对话长记忆摘要：
-{memory.get("conversation_summary", "")}
+当前会话最近问题：
+{recent_questions}
 
-最近问题：
-{memory.get("recent_questions", [])}
+当前会话简短摘要：
+{rolling_summary}
+
+当前用户背景信息（全局共享，可按需参考）：
+{user_memory_text}
 
 结构化论文分析：
 {overview}
@@ -137,3 +168,69 @@ def build_agent_answer_prompt(
 8. 如果问题问到公式，必须解释公式含义、变量作用、它在方法中的角色。
 9. 如果证据不足，请直接说“当前证据不足以确定”，不要编造。
 """.strip()
+
+
+def build_global_agent_answer_prompt(question: str) -> str:
+    return build_global_agent_answer_prompt_with_context(question, None, None)
+
+
+def build_global_agent_answer_prompt_with_context(
+    question: str,
+    conversation_context: dict | None = None,
+    user_memory: dict | None = None,
+) -> str:
+    context = conversation_context or {}
+    profile = user_memory or {}
+    recent_messages_text = "\n".join(
+        f"- [{item.get('role')}] {item.get('content_md')}"
+        for item in context.get("recent_messages", [])
+    ) or "无"
+    recent_questions = context.get("recent_questions", [])
+    rolling_summary = context.get("rolling_summary", "")
+    user_memory_text = f"""
+已读论文：
+{profile.get("read_paper_ids", [])}
+
+最近主题：
+{profile.get("recent_topics", [])}
+
+仍不熟的概念：
+{profile.get("weak_concepts", [])}
+
+已掌握的概念：
+{profile.get("mastered_concepts", [])}
+
+偏好的解释风格：
+{profile.get("preferred_explanation_style", "intuitive_then_formula")}
+
+已确认的跨论文关联：
+{profile.get("cross_paper_links", [])}
+""".strip()
+    return f'''
+你是一个自然、可靠的论文陪读智能体。
+
+当前对话不绑定某篇具体论文。请像一个正常助手一样直接回答用户当前问题。
+如果问题需要某篇论文的具体内容，明确提醒用户进入对应论文页再问更准确。
+
+用户问题：
+{question}
+
+当前会话最近上下文（可按需参考）：
+{recent_messages_text}
+
+当前会话最近问题：
+{recent_questions}
+
+当前会话简短摘要：
+{rolling_summary}
+
+当前用户背景信息（全局共享，可按需参考）：
+{user_memory_text}
+
+回答要求：
+1. 用中文 Markdown 回答。
+2. 优先自然回答用户当前问题，不要先做冗长的分类说明。
+3. 如果问题过于依赖某篇论文的具体内容，就明确说需要进入论文详情页继续追问。
+4. 不要编造用户历史、阅读记录或之前聊过的内容。
+5. 如果上下文不足，直接说明当前上下文不足。
+'''.strip()

@@ -84,6 +84,17 @@ export type ChatHistoryMessage = {
   citations: Citation[];
 };
 
+export type ChatConversation = {
+  conversation_id: string;
+  session_id: string;
+  conversation_type: "global_chat" | "paper_chat";
+  paper_id: string | null;
+  title: string;
+  created_at: string;
+  updated_at: string;
+  is_deleted: boolean;
+};
+
 export type ChatModelOption = {
   id: string;
   label: string;
@@ -102,6 +113,12 @@ export type MemoryOverview = {
   recent_stuck_points: Array<{ paper_title: string; concept: string; last_seen_at: string }>;
 };
 
+export type CrossPaperLink = {
+  source_paper_id: string;
+  target_paper_id: string;
+  relation: string;
+};
+
 export type ReadingMemory = {
   paper_id: string;
   progress_status: string;
@@ -109,4 +126,99 @@ export type ReadingMemory = {
   last_read_section: string;
   stuck_points: string[];
   key_questions: string[];
+  important_takeaways?: string[];
+  method_summary?: string;
+  experiment_takeaways?: string[];
+  concepts_seen?: string[];
+  linked_papers?: Array<{
+    paper_id: string;
+    paper_title: string;
+    relation: string;
+  }>;
+};
+
+export type UserEntityMemory = {
+  scope_type: "user";
+  scope_id: string;
+  user_id: string;
+  read_paper_ids: string[];
+  preferred_explanation_style: string;
+  recent_topics: string[];
+  paper_link_candidates: CrossPaperLink[];
+  weak_concepts: string[];
+  mastered_concepts: string[];
+  cross_paper_links: CrossPaperLink[];
+};
+
+export type PaperEntityMemoryCard = {
+  paper_id: string;
+  paper_title: string;
+  created_at: string;
+  updated_at: string;
+  summary_card: string;
+  motivation: string;
+  problem: string;
+  core_proposal: string;
+  method: string;
+  value: string;
+  resolved_gap: string;
+  test_data: string;
+  key_results: string;
+  keywords: string[];
+};
+
+export type PaperEntityMemoryListResponse = {
+  items: PaperEntityMemoryCard[];
+  total: number;
+};
+
+export type MemoryItem = {
+  memory_id: string;
+  scope: string;
+  scope_type: "session" | "paper" | "user";
+  scope_id: string;
+  memory_type: string;
+  payload: Record<string, unknown>;
+  summary: string;
+  paper_id?: string | null;
+  paper_title?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+  is_enabled: boolean;
+  write_reason?: string | null;
+  write_confidence?: number | null;
+  source_question?: string | null;
+  source_answer_preview?: string | null;
+};
+
+export type MemoryItemListResponse = {
+  items: MemoryItem[];
+  total: number;
+};
+
+export type SessionMemoryMessage = {
+  message_id: string;
+  role: "user" | "assistant";
+  content_md: string;
+  created_at: string;
+};
+
+export type SessionMemoryView = {
+  conversation_id: string;
+  conversation_type: "global_chat" | "paper_chat";
+  title: string;
+  paper_id: string | null;
+  paper_title?: string | null;
+  created_at: string;
+  updated_at: string;
+  is_empty: boolean;
+  recent_questions: string[];
+  rolling_summary: string;
+  recent_messages: SessionMemoryMessage[];
+  recent_messages_count: number;
+};
+
+export type SessionMemoryListResponse = {
+  items: SessionMemoryView[];
+  total: number;
 };

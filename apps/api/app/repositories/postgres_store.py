@@ -8,8 +8,6 @@ from sqlalchemy import select
 
 from app.db.session import get_session
 from app.models.artifacts import (
-    ChatMessageModel,
-    ChatSessionModel,
     PaperOverviewModel,
     PaperStructureModel,
     ReadingMemoryModel,
@@ -18,11 +16,15 @@ from app.models.paper import IngestionJobModel, PaperModel
 
 
 class PostgresStoreRepository:
-    def save_file(self, paper_id: str, filename: str, content: bytes) -> str:
-        # File storage remains on local disk even when metadata is in PostgreSQL.
+    @staticmethod
+    def _local_store():
         from app.repositories.local_store import LocalStoreRepository
 
-        return LocalStoreRepository().save_file(paper_id=paper_id, filename=filename, content=content)
+        return LocalStoreRepository()
+
+    def save_file(self, paper_id: str, filename: str, content: bytes) -> str:
+        # File storage remains on local disk even when metadata is in PostgreSQL.
+        return self._local_store().save_file(paper_id=paper_id, filename=filename, content=content)
 
     def list_papers(self) -> list[dict[str, Any]]:
         with get_session() as session:
@@ -112,6 +114,15 @@ class PostgresStoreRepository:
             model = session.get(PaperOverviewModel, paper_id)
             return deepcopy(model.payload) if model else None
 
+    def save_paper_entity_card(self, paper_id: str, card: dict[str, Any]) -> None:
+        self._local_store().save_paper_entity_card(paper_id, card)
+
+    def get_paper_entity_card(self, paper_id: str) -> dict[str, Any] | None:
+        return self._local_store().get_paper_entity_card(paper_id)
+
+    def list_paper_entity_cards(self) -> list[dict[str, Any]]:
+        return self._local_store().list_paper_entity_cards()
+
     def save_memory(self, paper_id: str, memory: dict[str, Any]) -> None:
         with get_session() as session:
             model = session.get(ReadingMemoryModel, paper_id)
@@ -137,35 +148,68 @@ class PostgresStoreRepository:
                 "key_questions": deepcopy(model.key_questions),
             }
 
+    def save_scoped_memory(self, scope_key: str, memory: dict[str, Any]) -> None:
+        self._local_store().save_scoped_memory(scope_key, memory)
+
+    def get_scoped_memory(self, scope_key: str) -> dict[str, Any] | None:
+        return self._local_store().get_scoped_memory(scope_key)
+
+    def list_scoped_memories(self) -> dict[str, Any]:
+        return self._local_store().list_scoped_memories()
+
+    def save_memory_item_state(self, memory_id: str, state: dict[str, Any]) -> None:
+        self._local_store().save_memory_item_state(memory_id, state)
+
+    def get_memory_item_state(self, memory_id: str) -> dict[str, Any] | None:
+        return self._local_store().get_memory_item_state(memory_id)
+
+    def list_memory_item_states(self) -> dict[str, Any]:
+        return self._local_store().list_memory_item_states()
+
+    def save_memory_item_meta(self, memory_id: str, meta: dict[str, Any]) -> None:
+        self._local_store().save_memory_item_meta(memory_id, meta)
+
+    def get_memory_item_meta(self, memory_id: str) -> dict[str, Any] | None:
+        return self._local_store().get_memory_item_meta(memory_id)
+
+    def list_memory_item_meta(self) -> dict[str, Any]:
+        return self._local_store().list_memory_item_meta()
+
+    def delete_memory_item_aux(self, memory_id: str) -> None:
+        self._local_store().delete_memory_item_aux(memory_id)
+
     def create_chat_session(self, session_data: dict[str, Any]) -> dict[str, Any]:
-        with get_session() as session:
-            session.add(ChatSessionModel(**session_data))
-            session.commit()
-            return deepcopy(session_data)
+        return self._local_store().create_chat_session(session_data)
+
+    def get_chat_session_by_paper(self, paper_id: str) -> dict[str, Any] | None:
+        return self._local_store().get_chat_session_by_paper(paper_id)
+
+    def get_chat_session_by_key(self, session_key: str) -> dict[str, Any] | None:
+        return self._local_store().get_chat_session_by_key(session_key)
+
+    def get_chat_session(self, session_id: str) -> dict[str, Any] | None:
+        return self._local_store().get_chat_session(session_id)
+
+    def list_global_chat_sessions(self) -> list[dict[str, Any]]:
+        return self._local_store().list_global_chat_sessions()
+
+    def list_chat_sessions(self) -> list[dict[str, Any]]:
+        return self._local_store().list_chat_sessions()
+
+    def update_chat_session(self, session_id: str, patch: dict[str, Any]) -> dict[str, Any]:
+        return self._local_store().update_chat_session(session_id, patch)
+
+    def delete_global_chat_session(self, session_id: str) -> None:
+        self._local_store().delete_global_chat_session(session_id)
 
     def create_chat_message(self, message: dict[str, Any]) -> dict[str, Any]:
-        with get_session() as session:
-            payload = {"citations": [], **message}
-            session.add(ChatMessageModel(**payload))
-            session.commit()
-            return deepcopy(payload)
+        return self._local_store().create_chat_message(message)
 
     def list_chat_messages(self, session_id: str) -> list[dict[str, Any]]:
-        with get_session() as session:
-            messages = session.scalars(
-                select(ChatMessageModel).where(ChatMessageModel.session_id == session_id)
-            ).all()
-            return [
-                {
-                    "message_id": item.message_id,
-                    "session_id": item.session_id,
-                    "role": item.role,
-                    "content_md": item.content_md,
-                    "citations": deepcopy(item.citations),
-                    "created_at": item.created_at,
-                }
-                for item in messages
-            ]
+        return self._local_store().list_chat_messages(session_id)
+
+    def delete_chat_messages(self, session_id: str) -> None:
+        self._local_store().delete_chat_messages(session_id)
 
     @staticmethod
     def _paper_to_dict(model: PaperModel) -> dict[str, Any]:

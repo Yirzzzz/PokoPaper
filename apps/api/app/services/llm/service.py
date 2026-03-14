@@ -6,6 +6,7 @@ from typing import Any
 
 from app.agents.prompts.paper_analysis_prompt import (
     build_agent_answer_prompt,
+    build_global_agent_answer_prompt_with_context,
     build_paper_analysis_prompt,
 )
 from app.core.config import settings
@@ -52,7 +53,8 @@ class LLMService:
         question: str,
         overview: dict[str, Any],
         evidence_chunks: list[dict[str, Any]],
-        memory: dict[str, Any],
+        conversation_context: dict[str, Any] | None = None,
+        user_memory: dict[str, Any] | None = None,
         enable_thinking: bool | None = None,
     ) -> str | None:
         self.last_debug_info = None
@@ -120,7 +122,8 @@ class LLMService:
                             question=question,
                             overview=overview,
                             evidence_chunks=evidence_chunks,
-                            memory=memory,
+                            conversation_context=conversation_context,
+                            user_memory=user_memory,
                         ),
                     },
                 ],
@@ -158,6 +161,122 @@ class LLMService:
             }
             logger.exception(
                 "llm.answer failed: provider=%s model=%s error=%s",
+                model_config["provider"],
+                model_config["model"],
+                exc,
+            )
+            return None
+
+    def generate_global_memory_answer(
+        self,
+        selected_model: str | None,
+        question: str,
+        conversation_context: dict[str, Any] | None = None,
+        user_memory: dict[str, Any] | None = None,
+        enable_thinking: bool | None = None,
+    ) -> str | None:
+        self.last_debug_info = None
+        model_config = self.get_model_config(selected_model)
+        if model_config is None:
+            self.last_debug_info = {
+                "stage": "global_answer",
+                "status": "skipped",
+                "reason": "no_enabled_external_model",
+                "selected_model": selected_model,
+            }
+            logger.info("llm.global skipped: no enabled external model, using fallback")
+            return None
+
+        try:
+            from openai import OpenAI
+        except ImportError:
+            self.last_debug_info = {
+                "stage": "global_answer",
+                "status": "skipped",
+                "reason": "openai_package_not_installed",
+                "provider": model_config["provider"],
+                "model": model_config["model"],
+            }
+            logger.warning("llm.global skipped: openai package not installed")
+            return None
+
+        client = OpenAI(
+            base_url=model_config["base_url"],
+            api_key=self._get_api_key(model_config["provider"]),
+        )
+        try:
+            extra_body = self._build_extra_body(
+                provider=model_config["provider"],
+                enable_thinking=enable_thinking,
+                stream=True,
+            )
+            logger.info(
+                "llm.global request: provider=%s model=%s selected=%s",
+                model_config["provider"],
+                model_config["model"],
+                selected_model,
+            )
+            self.last_debug_info = {
+                "stage": "global_answer",
+                "status": "requesting",
+                "provider": model_config["provider"],
+                "model": model_config["model"],
+                "selected_model": selected_model,
+                "base_url": model_config["base_url"],
+                "extra_body": extra_body,
+                "thinking_effective": bool(extra_body and extra_body.get("enable_thinking")),
+            }
+            content, reasoning = self._stream_completion(
+                client=client,
+                model=model_config["model"],
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "你是一个论文陪读智能体。",
+                    },
+                    {
+                        "role": "user",
+                        "content": build_global_agent_answer_prompt_with_context(
+                            question=question,
+                            conversation_context=conversation_context,
+                            user_memory=user_memory,
+                        ),
+                    },
+                ],
+                extra_body=extra_body,
+            )
+            logger.info(
+                "llm.global success: provider=%s model=%s has_content=%s has_reasoning=%s",
+                model_config["provider"],
+                model_config["model"],
+                bool(content),
+                bool(reasoning),
+            )
+            self.last_debug_info = {
+                "stage": "global_answer",
+                "status": "success",
+                "provider": model_config["provider"],
+                "model": model_config["model"],
+                "selected_model": selected_model,
+                "base_url": model_config["base_url"],
+                "has_content": bool(content),
+                "has_reasoning": bool(reasoning),
+                "streaming_used": True,
+            }
+            return content
+        except Exception as exc:
+            self.last_debug_info = {
+                "stage": "global_answer",
+                "status": "failed",
+                "provider": model_config["provider"],
+                "model": model_config["model"],
+                "selected_model": selected_model,
+                "base_url": model_config["base_url"],
+                "error_type": exc.__class__.__name__,
+                "error": str(exc),
+            }
+            logger.exception(
+                "llm.global failed: provider=%s model=%s error=%s",
                 model_config["provider"],
                 model_config["model"],
                 exc,
