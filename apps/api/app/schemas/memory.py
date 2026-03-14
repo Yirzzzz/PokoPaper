@@ -186,6 +186,38 @@ class SessionMemoryListResponse(BaseModel):
     total: int
 
 
+class SessionSummaryRecord(BaseModel):
+    summary_text: str = ""
+    discussion_topics: list[str] = Field(default_factory=list)
+    key_points: list[str] = Field(default_factory=list)
+    open_questions: list[str] = Field(default_factory=list)
+    last_updated_at: str = ""
+    covered_message_until: str = ""
+
+
+class SessionSummaryView(BaseModel):
+    conversation_id: str
+    conversation_type: str
+    title: str
+    paper_id: str | None = None
+    paper_title: str | None = None
+    created_at: str
+    updated_at: str
+    is_empty: bool
+    summary_text: str = ""
+    discussion_topics: list[str] = Field(default_factory=list)
+    key_points: list[str] = Field(default_factory=list)
+    open_questions: list[str] = Field(default_factory=list)
+    last_updated_at: str = ""
+    covered_message_until: str = ""
+    pending_messages_count: int = 0
+
+
+class SessionSummaryListResponse(BaseModel):
+    items: list[SessionSummaryView]
+    total: int
+
+
 class PaperEntityMemoryCard(BaseModel):
     paper_id: str
     paper_title: str

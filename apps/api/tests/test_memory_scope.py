@@ -60,6 +60,44 @@ class StableChatModeTestCase(unittest.TestCase):
             },
         )
 
+    @staticmethod
+    def _append_user_message(
+        repo: LocalStoreRepository,
+        conversation_id: str,
+        turn_index: int,
+        question: str,
+    ) -> None:
+        base_minute = turn_index * 2
+        repo.create_chat_message(
+            {
+                "message_id": f"{conversation_id}-user-{turn_index}",
+                "session_id": conversation_id,
+                "role": "user",
+                "content_md": question,
+                "citations": [],
+                "created_at": f"2026-03-14T00:{base_minute:02d}:00+00:00",
+            }
+        )
+
+    @staticmethod
+    def _append_assistant_message(
+        repo: LocalStoreRepository,
+        conversation_id: str,
+        turn_index: int,
+        answer: str,
+    ) -> None:
+        base_minute = turn_index * 2
+        repo.create_chat_message(
+            {
+                "message_id": f"{conversation_id}-assistant-{turn_index}",
+                "session_id": conversation_id,
+                "role": "assistant",
+                "content_md": answer,
+                "citations": [],
+                "created_at": f"2026-03-14T00:{base_minute + 1:02d}:00+00:00",
+            }
+        )
+
     def test_global_chat_supports_multiple_create_switch_and_delete(self) -> None:
         repo = LocalStoreRepository()
         first = repo.create_chat_session(
@@ -266,7 +304,12 @@ class StableChatModeTestCase(unittest.TestCase):
             conversation_context={
                 "recent_messages": [{"role": "user", "content_md": "上一轮问题"}],
                 "recent_questions": ["上一轮问题"],
-                "rolling_summary": "刚才在讨论方法主线",
+                "session_summary": {
+                    "summary_text": "更早的历史在讨论方法主线",
+                    "discussion_topics": ["method"],
+                    "key_points": ["讨论过方法主线"],
+                    "open_questions": ["那个模块为什么有效"],
+                },
             },
             user_memory={
                 "read_paper_ids": ["paper-1"],
@@ -280,8 +323,10 @@ class StableChatModeTestCase(unittest.TestCase):
         global_prompt = build_global_agent_answer_prompt("你好")
 
         self.assertIn("当前会话最近上下文", prompt)
+        self.assertIn("当前会话较早历史摘要", prompt)
         self.assertIn("当前用户背景信息", prompt)
         self.assertIn("intuitive_with_examples", prompt)
+        self.assertIn("更早的历史在讨论方法主线", prompt)
         self.assertNotIn("先判断问题类型", prompt)
         self.assertNotIn("属于哪一类", prompt)
         self.assertNotIn("记忆不足", global_prompt)
@@ -602,8 +647,180 @@ class StableChatModeTestCase(unittest.TestCase):
         context = memory.build_context("session-window-five")
 
         self.assertEqual(context["recent_questions"], [f"question {index}" for index in range(1, 6)])
-        self.assertNotIn("question 0", context["rolling_summary"])
-        self.assertIn("question 5", context["rolling_summary"])
+        self.assertEqual(context["session_summary"]["summary_text"], "")
+
+    def test_expired_messages_move_into_pending_summary_buffer(self) -> None:
+        repo = LocalStoreRepository()
+        memory = ShortTermMemoryService()
+
+        for index in range(5):
+            self._append_user_message(repo, "session-summary-pending", index, f"question {index}")
+            memory.update_short_term_memory(
+                conversation_id="session-summary-pending",
+                question=f"question {index}",
+                answer=f"answer {index}",
+            )
+            self._append_assistant_message(repo, "session-summary-pending", index, f"answer {index}")
+
+        stored = memory.get_short_term_memory("session-summary-pending")
+
+        self.assertGreaterEqual(len(stored["pending_messages"]), 1)
+        self.assertEqual(stored["session_summary"]["summary_text"], "")
+
+    def test_summary_updates_after_pending_buffer_reaches_threshold(self) -> None:
+        repo = LocalStoreRepository()
+        memory = ShortTermMemoryService()
+
+        for index in range(6):
+            self._append_user_message(repo, "session-summary-trigger", index, f"question {index}")
+            memory.update_short_term_memory(
+                conversation_id="session-summary-trigger",
+                question=f"question {index}",
+                answer=f"answer {index}",
+            )
+            self._append_assistant_message(repo, "session-summary-trigger", index, f"answer {index}")
+
+        stored = memory.get_short_term_memory("session-summary-trigger")
+
+        self.assertEqual(stored["pending_messages"], [])
+        self.assertNotEqual(stored["session_summary"]["summary_text"], "")
+        self.assertNotEqual(stored["session_summary"]["covered_message_until"], "")
+
+    def test_session_summary_updates_incrementally_instead_of_full_rewrite(self) -> None:
+        repo = LocalStoreRepository()
+        memory = ShortTermMemoryService()
+
+        for index in range(6):
+            self._append_user_message(repo, "session-summary-incremental", index, f"Transformer topic {index}")
+            memory.update_short_term_memory(
+                conversation_id="session-summary-incremental",
+                question=f"Transformer topic {index}",
+                answer=f"answer {index}",
+            )
+            self._append_assistant_message(repo, "session-summary-incremental", index, f"answer {index}")
+
+        first_summary = memory.get_short_term_memory("session-summary-incremental")["session_summary"]
+
+        for index in range(6, 7):
+            self._append_user_message(repo, "session-summary-incremental", index, f"Retriever topic {index}")
+            memory.update_short_term_memory(
+                conversation_id="session-summary-incremental",
+                question=f"Retriever topic {index}",
+                answer=f"answer {index}",
+            )
+            self._append_assistant_message(repo, "session-summary-incremental", index, f"answer {index}")
+
+        second_summary = memory.get_short_term_memory("session-summary-incremental")["session_summary"]
+
+        self.assertIn("Transformer", "".join(second_summary["discussion_topics"]))
+        self.assertEqual(first_summary["covered_message_until"], second_summary["covered_message_until"])
+
+        for index in range(7, 12):
+            self._append_user_message(repo, "session-summary-incremental", index, f"Retriever topic {index}")
+            memory.update_short_term_memory(
+                conversation_id="session-summary-incremental",
+                question=f"Retriever topic {index}",
+                answer=f"answer {index}",
+            )
+            self._append_assistant_message(repo, "session-summary-incremental", index, f"answer {index}")
+
+        third_summary = memory.get_short_term_memory("session-summary-incremental")["session_summary"]
+
+        self.assertIn("Transformer", "".join(third_summary["discussion_topics"]))
+        self.assertIn("Retriever", "".join(third_summary["discussion_topics"]))
+        self.assertNotEqual(second_summary["covered_message_until"], third_summary["covered_message_until"])
+
+    def test_low_signal_turns_do_not_pollute_session_summary(self) -> None:
+        repo = LocalStoreRepository()
+        memory = ShortTermMemoryService()
+
+        for index, question in enumerate(["你好", "继续", "谢谢", "好的", "attention 机制是什么", "它为什么有效"]):
+            self._append_user_message(repo, "session-summary-low-signal", index, question)
+            memory.update_short_term_memory(
+                conversation_id="session-summary-low-signal",
+                question=question,
+                answer="assistant answer",
+            )
+            self._append_assistant_message(repo, "session-summary-low-signal", index, "assistant answer")
+
+        stored = memory.get_short_term_memory("session-summary-low-signal")
+
+        self.assertNotIn("你好", stored["session_summary"]["summary_text"])
+        self.assertNotIn("谢谢", stored["session_summary"]["summary_text"])
+
+    def test_session_summary_does_not_cross_conversations(self) -> None:
+        repo = LocalStoreRepository()
+        memory = ShortTermMemoryService()
+
+        for index in range(6):
+            self._append_user_message(repo, "session-summary-a", index, f"Alpha topic {index}")
+            memory.update_short_term_memory(
+                conversation_id="session-summary-a",
+                question=f"Alpha topic {index}",
+                answer="alpha answer",
+            )
+            self._append_assistant_message(repo, "session-summary-a", index, "alpha answer")
+            self._append_user_message(repo, "session-summary-b", index, f"Beta topic {index}")
+            memory.update_short_term_memory(
+                conversation_id="session-summary-b",
+                question=f"Beta topic {index}",
+                answer="beta answer",
+            )
+            self._append_assistant_message(repo, "session-summary-b", index, "beta answer")
+
+        summary_a = memory.get_short_term_memory("session-summary-a")["session_summary"]["summary_text"]
+        summary_b = memory.get_short_term_memory("session-summary-b")["session_summary"]["summary_text"]
+
+        self.assertIn("Alpha", summary_a)
+        self.assertNotIn("Beta", summary_a)
+        self.assertIn("Beta", summary_b)
+        self.assertNotIn("Alpha", summary_b)
+
+    def test_can_list_session_summary_views(self) -> None:
+        repo = LocalStoreRepository()
+        repo.create_chat_session(
+            {
+                "session_id": "session-summary-view",
+                "conversation_id": "session-summary-view",
+                "conversation_type": ConversationType.GLOBAL_CHAT,
+                "paper_id": None,
+                "title": "Summary View",
+                "created_at": "2026-03-14T00:00:00+00:00",
+                "updated_at": "2026-03-14T00:00:00+00:00",
+            }
+        )
+        memory = ShortTermMemoryService()
+        for index in range(6):
+            self._append_user_message(repo, "session-summary-view", index, f"topic {index}")
+            memory.update_short_term_memory("session-summary-view", f"topic {index}", f"answer {index}")
+            self._append_assistant_message(repo, "session-summary-view", index, f"answer {index}")
+
+        views = memory.list_session_summary_views()
+
+        self.assertEqual(len(views), 1)
+        self.assertEqual(views[0]["conversation_id"], "session-summary-view")
+        self.assertNotEqual(views[0]["summary_text"], "")
+        self.assertGreaterEqual(views[0]["pending_messages_count"], 0)
+
+    def test_empty_session_summary_view_shows_empty_state(self) -> None:
+        repo = LocalStoreRepository()
+        repo.create_chat_session(
+            {
+                "session_id": "session-summary-empty",
+                "conversation_id": "session-summary-empty",
+                "conversation_type": ConversationType.GLOBAL_CHAT,
+                "paper_id": None,
+                "title": "Summary Empty",
+                "created_at": "2026-03-14T00:00:00+00:00",
+                "updated_at": "2026-03-14T00:00:00+00:00",
+            }
+        )
+
+        view = ShortTermMemoryService().get_session_summary_view("session-summary-empty")
+
+        self.assertTrue(view["is_empty"])
+        self.assertEqual(view["summary_text"], "")
+        self.assertEqual(view["discussion_topics"], [])
 
     def test_ingestion_driven_user_memory_updates_read_history_topics_and_candidates_only(self) -> None:
         repo = LocalStoreRepository()

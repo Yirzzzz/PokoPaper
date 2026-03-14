@@ -32,7 +32,12 @@ class PaperCompanionAgent:
                 answer=answer["answer_md"],
                 overview=None,
             )
-            self.short_term_memory.update_short_term_memory(session_id, question, answer["answer_md"])
+            self.short_term_memory.update_short_term_memory(
+                session_id,
+                question,
+                answer["answer_md"],
+                selected_model=selected_model,
+            )
             return answer
 
         answer = self.rag_service.answer_question(
@@ -48,5 +53,10 @@ class PaperCompanionAgent:
             answer=answer["answer_md"],
             overview=answer.get("overview"),
         )
-        self.short_term_memory.update_short_term_memory(session_id, question, answer["answer_md"])
+        self.short_term_memory.update_short_term_memory(
+            session_id,
+            question,
+            answer["answer_md"],
+            selected_model=selected_model,
+        )
         return answer

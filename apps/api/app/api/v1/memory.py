@@ -9,6 +9,8 @@ from app.schemas.memory import (
     MemoryResetRequest,
     ReadingMemoryResponse,
     SessionMemoryListResponse,
+    SessionSummaryListResponse,
+    SessionSummaryView,
     SessionMemoryView,
     UserMemoryResponse,
 )
@@ -119,6 +121,20 @@ def list_session_memories() -> dict:
 def get_session_memory_view(conversation_id: str) -> dict:
     try:
         return short_term_memory_service.get_session_memory_view(conversation_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.get("/session-summaries", response_model=SessionSummaryListResponse)
+def list_session_summaries() -> dict:
+    items = short_term_memory_service.list_session_summary_views()
+    return {"items": items, "total": len(items)}
+
+
+@router.get("/session-summaries/{conversation_id}", response_model=SessionSummaryView)
+def get_session_summary_view(conversation_id: str) -> dict:
+    try:
+        return short_term_memory_service.get_session_summary_view(conversation_id)
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 

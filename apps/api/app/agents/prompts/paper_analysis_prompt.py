@@ -113,7 +113,20 @@ def build_agent_answer_prompt(
         for item in context.get("recent_messages", [])
     ) or "无"
     recent_questions = context.get("recent_questions", [])
-    rolling_summary = context.get("rolling_summary", "")
+    session_summary = context.get("session_summary") or {}
+    session_summary_text = f"""
+summary_text:
+{session_summary.get("summary_text", "") or "无"}
+
+discussion_topics:
+{session_summary.get("discussion_topics", [])}
+
+key_points:
+{session_summary.get("key_points", [])}
+
+open_questions:
+{session_summary.get("open_questions", [])}
+""".strip()
     user_memory_text = f"""
 已读论文：
 {profile.get("read_paper_ids", [])}
@@ -145,8 +158,8 @@ def build_agent_answer_prompt(
 当前会话最近问题：
 {recent_questions}
 
-当前会话简短摘要：
-{rolling_summary}
+当前会话较早历史摘要（可按需参考）：
+{session_summary_text}
 
 当前用户背景信息（全局共享，可按需参考）：
 {user_memory_text}
@@ -186,7 +199,20 @@ def build_global_agent_answer_prompt_with_context(
         for item in context.get("recent_messages", [])
     ) or "无"
     recent_questions = context.get("recent_questions", [])
-    rolling_summary = context.get("rolling_summary", "")
+    session_summary = context.get("session_summary") or {}
+    session_summary_text = f"""
+summary_text:
+{session_summary.get("summary_text", "") or "无"}
+
+discussion_topics:
+{session_summary.get("discussion_topics", [])}
+
+key_points:
+{session_summary.get("key_points", [])}
+
+open_questions:
+{session_summary.get("open_questions", [])}
+""".strip()
     user_memory_text = f"""
 已读论文：
 {profile.get("read_paper_ids", [])}
@@ -221,8 +247,8 @@ def build_global_agent_answer_prompt_with_context(
 当前会话最近问题：
 {recent_questions}
 
-当前会话简短摘要：
-{rolling_summary}
+当前会话较早历史摘要（可按需参考）：
+{session_summary_text}
 
 当前用户背景信息（全局共享，可按需参考）：
 {user_memory_text}

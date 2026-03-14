@@ -13,6 +13,8 @@ import type {
   ReadingMemory,
   SessionMemoryListResponse,
   SessionMemoryView,
+  SessionSummaryListResponse,
+  SessionSummaryView,
   UserEntityMemory,
 } from "@/types";
 
@@ -156,6 +158,14 @@ export async function clearSessionMemory(conversationId: string) {
     throw new Error("Clear session memory failed");
   }
   return response.json() as Promise<SessionMemoryView>;
+}
+
+export async function fetchSessionSummaries() {
+  return getJson<SessionSummaryListResponse>("/memory/session-summaries");
+}
+
+export async function fetchSessionSummary(conversationId: string) {
+  return getJson<SessionSummaryView>(`/memory/session-summaries/${conversationId}`);
 }
 
 export async function fetchChatModels() {

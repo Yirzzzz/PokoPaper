@@ -222,3 +222,26 @@ export type SessionMemoryListResponse = {
   items: SessionMemoryView[];
   total: number;
 };
+
+export type SessionSummaryView = {
+  conversation_id: string;
+  conversation_type: "global_chat" | "paper_chat";
+  title: string;
+  paper_id: string | null;
+  paper_title?: string | null;
+  created_at: string;
+  updated_at: string;
+  is_empty: boolean;
+  summary_text: string;
+  discussion_topics: string[];
+  key_points: string[];
+  open_questions: string[];
+  last_updated_at: string;
+  covered_message_until: string;
+  pending_messages_count: number;
+};
+
+export type SessionSummaryListResponse = {
+  items: SessionSummaryView[];
+  total: number;
+};

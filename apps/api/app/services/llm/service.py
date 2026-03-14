@@ -283,6 +283,113 @@ class LLMService:
             )
             return None
 
+    def generate_incremental_session_summary(
+        self,
+        selected_model: str | None,
+        existing_summary: dict[str, Any],
+        new_messages: list[dict[str, Any]],
+    ) -> dict[str, Any] | None:
+        self.last_debug_info = None
+        if settings.use_mock_services:
+            self.last_debug_info = {
+                "stage": "session_summary",
+                "status": "skipped",
+                "reason": "mock_services_enabled",
+                "selected_model": selected_model,
+            }
+            return None
+        model_config = self.get_model_config(selected_model)
+        if model_config is None:
+            self.last_debug_info = {
+                "stage": "session_summary",
+                "status": "skipped",
+                "reason": "no_enabled_external_model",
+                "selected_model": selected_model,
+            }
+            return None
+
+        try:
+            from openai import OpenAI
+        except ImportError:
+            self.last_debug_info = {
+                "stage": "session_summary",
+                "status": "skipped",
+                "reason": "openai_package_not_installed",
+                "provider": model_config["provider"],
+                "model": model_config["model"],
+            }
+            return None
+
+        client = OpenAI(
+            base_url=model_config["base_url"],
+            api_key=self._get_api_key(model_config["provider"]),
+        )
+        prompt = f"""
+你要做当前会话的增量摘要更新。输入包括“旧摘要”和“新过期消息”。
+请只基于旧摘要与新增消息输出新的结构化 JSON，不要全量重写无关内容。
+
+旧摘要：
+{json.dumps(existing_summary, ensure_ascii=False)}
+
+新过期消息：
+{json.dumps(new_messages, ensure_ascii=False)}
+
+输出 JSON：
+{{
+  "summary_text": "简短摘要",
+  "discussion_topics": ["topic1"],
+  "key_points": ["point1"],
+  "open_questions": ["question1"]
+}}
+
+要求：
+1. 只保留与当前会话后续追问相关的信息。
+2. 不要保留“你好、谢谢、继续”这类低信息量内容。
+3. 结果要简洁、可增量累积。
+4. 只输出 JSON。
+""".strip()
+
+        try:
+            content, reasoning = self._stream_completion(
+                client=client,
+                model=model_config["model"],
+                messages=[
+                    {"role": "system", "content": "你是一个会话增量摘要器。"},
+                    {"role": "user", "content": prompt},
+                ],
+                extra_body=self._build_extra_body(
+                    provider=model_config["provider"],
+                    enable_thinking=False,
+                    stream=True,
+                ),
+            )
+            parsed = json.loads(content)
+            self.last_debug_info = {
+                "stage": "session_summary",
+                "status": "success",
+                "provider": model_config["provider"],
+                "model": model_config["model"],
+                "has_content": bool(content),
+                "has_reasoning": bool(reasoning),
+            }
+            return parsed if isinstance(parsed, dict) else None
+        except Exception as exc:
+            self.last_debug_info = {
+                "stage": "session_summary",
+                "status": "failed",
+                "provider": model_config["provider"],
+                "model": model_config["model"],
+                "error_type": exc.__class__.__name__,
+                "error": str(exc),
+            }
+            logger.exception(
+                "llm.session_summary failed: provider=%s model=%s error=%s",
+                model_config["provider"],
+                model_config["model"],
+                exc,
+            )
+            return None
+
     def generate_structured_analysis(
         self,
         title: str,
