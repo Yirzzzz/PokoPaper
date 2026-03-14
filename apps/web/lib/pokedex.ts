@@ -164,6 +164,6 @@ export function getPokemonCompanion(paper: Pick<PaperCard, "id" | "title">): Pok
   return {
     dexId,
     name,
-    spriteUrl: `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-i/red-blue/${dexId}.png`,
+    spriteUrl: `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${dexId}.png`,
   };
 }

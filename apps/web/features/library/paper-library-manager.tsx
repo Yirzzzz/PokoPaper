@@ -74,6 +74,10 @@ export function PaperLibraryManager({
     return [...filtered].sort((left, right) => left.title.localeCompare(right.title));
   }, [papers, sortMode, statusFilter, typeFilter]);
 
+  const editingPaper = editingPaperId
+    ? papers.find((paper) => paper.id === editingPaperId) ?? null
+    : null;
+
   return (
     <div className="mt-5 space-y-5">
       {showPokedexControls ? (
@@ -264,56 +268,106 @@ export function PaperLibraryManager({
                 </Link>
               </div>
 
-              {isEditing ? (
-                <div className="mt-4 grid gap-3 rounded-[1.75rem] border border-white/10 bg-black/20 p-4 md:grid-cols-[1fr_1fr_auto]">
-                  <input
-                    value={categoryDraft}
-                    onChange={(event) => setCategoryDraft(event.target.value)}
-                    placeholder="系别，例如：CV / LLM / RAG"
-                    className="rounded-2xl border border-white/10 bg-white/20 px-4 py-3 text-sm text-white outline-none placeholder:text-white/60"
-                  />
-                  <input
-                    value={tagsDraft}
-                    onChange={(event) => setTagsDraft(event.target.value)}
-                    placeholder="属性标签，逗号分隔"
-                    className="rounded-2xl border border-white/10 bg-white/20 px-4 py-3 text-sm text-white outline-none placeholder:text-white/60"
-                  />
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      disabled={isPending}
-                      onClick={() =>
-                        startTransition(async () => {
-                          await updatePaperMetadata(paper.id, {
-                            category: categoryDraft || null,
-                            tags: tagsDraft
-                              .split(",")
-                              .map((item) => item.trim())
-                              .filter(Boolean),
-                          });
-                          setEditingPaperId(null);
-                          router.refresh();
-                        })
-                      }
-                      className="rounded-full bg-brand px-4 py-2 text-xs font-medium text-black disabled:opacity-50"
-                    >
-                      保存
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setEditingPaperId(null)}
-                      className="rounded-full border border-white/10 px-4 py-2 text-xs text-white/80"
-                    >
-                      取消
-                    </button>
-                  </div>
-                </div>
-              ) : null}
             </article>
           );
         })
       )}
       </div>
+
+      {editingPaper ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-2xl rounded-[2rem] border border-black/10 bg-[linear-gradient(180deg,rgba(255,252,240,0.98),rgba(247,241,221,0.98))] p-6 shadow-[0_24px_120px_rgba(15,23,42,0.28)]">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-xs uppercase tracking-[0.28em] text-brand">编辑图鉴属性</p>
+                <h3 className="mt-3 text-2xl font-semibold text-slate-900">{editingPaper.title}</h3>
+                <p className="mt-2 text-sm text-slate-700">调整论文的系别与标签，不打断当前图鉴卡片的展示。</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingPaperId(null)}
+                className="rounded-full border border-black/10 bg-white/70 px-4 py-2 text-sm text-slate-700"
+              >
+                关闭
+              </button>
+            </div>
+
+            <div className="mt-6 grid gap-4">
+              <label className="grid gap-2 text-sm text-slate-700">
+                <span>系别 / Category</span>
+                <input
+                  value={categoryDraft}
+                  onChange={(event) => setCategoryDraft(event.target.value)}
+                  placeholder="例如：CV / LLM / RAG / Agents"
+                  className="rounded-[1.25rem] border border-black/10 bg-white/80 px-4 py-3 text-sm text-slate-900 outline-none placeholder:text-slate-500"
+                />
+              </label>
+
+              <label className="grid gap-2 text-sm text-slate-700">
+                <span>属性标签 / Tags</span>
+                <input
+                  value={tagsDraft}
+                  onChange={(event) => setTagsDraft(event.target.value)}
+                  placeholder="逗号分隔，例如：retrieval, planning, multimodal"
+                  className="rounded-[1.25rem] border border-black/10 bg-white/80 px-4 py-3 text-sm text-slate-900 outline-none placeholder:text-slate-500"
+                />
+              </label>
+
+              <div className="rounded-[1.5rem] border border-black/10 bg-white/60 p-4">
+                <p className="text-xs uppercase tracking-[0.24em] text-slate-500">预览</p>
+                <div className="mt-3 flex flex-wrap gap-2 text-sm">
+                  <span className="rounded-full border border-black/10 bg-white/85 px-3 py-2 text-slate-800">
+                    系别 · {categoryDraft.trim() || "未设系别"}
+                  </span>
+                  {tagsDraft
+                    .split(",")
+                    .map((item) => item.trim())
+                    .filter(Boolean)
+                    .slice(0, 4)
+                    .map((tag) => (
+                      <span
+                        key={`${editingPaper.id}-${tag}`}
+                        className="rounded-full border border-black/10 bg-white/85 px-3 py-2 text-slate-700"
+                      >
+                        {tag}
+                      </span>
+                    ))}
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-3 pt-2 sm:flex-row sm:justify-end">
+                <button
+                  type="button"
+                  onClick={() => setEditingPaperId(null)}
+                  className="rounded-full border border-black/10 bg-white/70 px-5 py-3 text-sm text-slate-700"
+                >
+                  取消
+                </button>
+                <button
+                  type="button"
+                  disabled={isPending}
+                  onClick={() =>
+                    startTransition(async () => {
+                      await updatePaperMetadata(editingPaper.id, {
+                        category: categoryDraft || null,
+                        tags: tagsDraft
+                          .split(",")
+                          .map((item) => item.trim())
+                          .filter(Boolean),
+                      });
+                      setEditingPaperId(null);
+                      router.refresh();
+                    })
+                  }
+                  className="rounded-full bg-brand px-5 py-3 text-sm font-medium text-slate-900 disabled:opacity-50"
+                >
+                  保存修改
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
