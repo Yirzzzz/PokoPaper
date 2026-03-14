@@ -8,7 +8,7 @@ export default async function MemoryPage() {
   const paperMemory = paper ? await fetchPaperMemory(paper.id) : null;
 
   return (
-    <AppShell>
+    <AppShell showContextPanel={false}>
       {paperMemory ? (
         <MemoryPanel overview={overview} paperMemory={paperMemory} />
       ) : (

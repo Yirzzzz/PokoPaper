@@ -6,7 +6,7 @@ export default async function ChatPage() {
   const papers = await fetchPapers();
   const paper = papers[0];
   return (
-    <AppShell>
+    <AppShell showContextPanel={false}>
       {paper ? (
         <ChatPanel paperId={paper.id} />
       ) : (

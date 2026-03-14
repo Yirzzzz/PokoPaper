@@ -7,7 +7,7 @@ export default async function HomePage() {
   const [papers, memory] = await Promise.all([fetchPapers(), fetchMemoryOverview()]);
 
   return (
-    <AppShell>
+    <AppShell showContextPanel={false}>
       <div className="space-y-4">
         <section className="glass-panel bg-hero-grid p-8 shadow-glow">
           <div className="flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
@@ -46,13 +46,20 @@ export default async function HomePage() {
                   <h3 className="mt-2 text-xl font-semibold text-slate-900">属性</h3>
                 </div>
               </div>
-              <div className="mt-4 flex flex-wrap gap-2">
-                {memory.active_topics.map((topic) => (
-                  <span key={topic} className="rounded-full border border-black/10 bg-white/60 px-3 py-2 text-sm font-medium text-slate-800">
-                    {topic}
-                  </span>
-                ))}
-              </div>
+              {memory.active_topics.length > 0 ? (
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {memory.active_topics.map((topic) => (
+                    <span
+                      key={topic}
+                      className="rounded-full border border-black/10 bg-white/60 px-3 py-2 text-sm font-medium text-slate-800"
+                    >
+                      {topic}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <p className="mt-4 text-sm text-slate-700">收录带标签的论文后会出现在这里。</p>
+              )}
             </section>
           </div>
 

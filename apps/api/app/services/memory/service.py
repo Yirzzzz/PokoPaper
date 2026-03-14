@@ -5,6 +5,32 @@ class MemoryService:
     def __init__(self) -> None:
         self.repo = get_repository()
 
+    @staticmethod
+    def _is_meaningful_topic(value: str | None) -> bool:
+        if not value:
+            return False
+        normalized = value.strip().lower()
+        return normalized not in {"", "unknown", "unknown author", "未设系别", "none", "null"}
+
+    def _collect_active_topics(self, papers: list[dict]) -> list[str]:
+        topic_counts: dict[str, int] = {}
+        topic_display: dict[str, str] = {}
+
+        for paper in papers:
+            candidates = [paper.get("category"), *(paper.get("tags") or [])]
+            for candidate in candidates:
+                if not isinstance(candidate, str) or not self._is_meaningful_topic(candidate):
+                    continue
+                normalized = candidate.strip().lower()
+                topic_counts[normalized] = topic_counts.get(normalized, 0) + 1
+                topic_display.setdefault(normalized, candidate.strip())
+
+        ranked = sorted(
+            topic_counts.items(),
+            key=lambda item: (-item[1], item[0]),
+        )
+        return [topic_display[key] for key, _ in ranked[:6]]
+
     def get_overview(self) -> dict:
         papers = self.repo.list_papers()
         memories = [self.repo.get_memory(paper["id"]) for paper in papers]
@@ -14,11 +40,13 @@ class MemoryService:
                 continue
             weak_concepts.extend(memory.get("stuck_points", []))
         weak_concepts = weak_concepts[:6]
+        active_topics = self._collect_active_topics(papers)
+
         return {
             "read_papers": len(papers),
             "weak_concepts": weak_concepts or ["retrieval routing", "formula interpretation"],
             "preferred_explanation_style": "intuitive_then_formula",
-            "active_topics": ["RAG", "paper agents", "reading memory"],
+            "active_topics": active_topics,
             "recent_stuck_points": [
                 {
                     "paper_title": paper["title"],
