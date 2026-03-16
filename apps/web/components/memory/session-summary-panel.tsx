@@ -19,16 +19,24 @@ function formatDate(value: string) {
   });
 }
 
-function TagList({ items, emptyLabel }: { items: string[]; emptyLabel: string }) {
+function TagList({
+  items,
+  emptyLabel,
+  keyPrefix,
+}: {
+  items: string[];
+  emptyLabel: string;
+  keyPrefix: string;
+}) {
   if (items.length === 0) {
     return <p className="mt-3 text-sm text-slate-600">{emptyLabel}</p>;
   }
 
   return (
     <div className="mt-3 flex flex-wrap gap-2">
-      {items.map((item) => (
+      {items.map((item, index) => (
         <span
-          key={item}
+          key={`${keyPrefix}:${index}:${item}`}
           className="rounded-full border border-black/10 bg-white/80 px-3 py-2 text-sm text-slate-800"
         >
           {item}
@@ -141,12 +149,20 @@ export function SessionSummaryPanel({ initialItems }: SessionSummaryPanelProps) 
             <div className="grid gap-4 lg:grid-cols-2">
               <section className="rounded-3xl border border-black/10 bg-white/50 p-4">
                 <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Discussion Topics</p>
-                <TagList items={selectedItem.discussion_topics} emptyLabel="当前没有 discussion_topics。" />
+                <TagList
+                  items={selectedItem.discussion_topics}
+                  emptyLabel="当前没有 discussion_topics。"
+                  keyPrefix={`${selectedItem.conversation_id}:discussion_topics`}
+                />
               </section>
 
               <section className="rounded-3xl border border-black/10 bg-white/50 p-4">
                 <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Open Questions</p>
-                <TagList items={selectedItem.open_questions} emptyLabel="当前没有 open_questions。" />
+                <TagList
+                  items={selectedItem.open_questions}
+                  emptyLabel="当前没有 open_questions。"
+                  keyPrefix={`${selectedItem.conversation_id}:open_questions`}
+                />
               </section>
             </div>
 
@@ -156,9 +172,9 @@ export function SessionSummaryPanel({ initialItems }: SessionSummaryPanelProps) 
                 <p className="mt-3 text-sm text-slate-600">当前没有 key_points。</p>
               ) : (
                 <div className="mt-3 space-y-2">
-                  {selectedItem.key_points.map((point) => (
+                  {selectedItem.key_points.map((point, index) => (
                     <div
-                      key={point}
+                      key={`${selectedItem.conversation_id}:key_point:${index}:${point}`}
                       className="rounded-2xl border border-black/10 bg-white/80 px-4 py-3 text-sm text-slate-800"
                     >
                       {point}

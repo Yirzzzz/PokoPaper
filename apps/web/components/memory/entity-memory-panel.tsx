@@ -14,10 +14,12 @@ function MemoryList({
   title,
   emptyLabel,
   items,
+  keyPrefix,
 }: {
   title: string;
   emptyLabel: string;
   items: string[];
+  keyPrefix: string;
 }) {
   return (
     <section className="rounded-3xl border border-black/10 bg-white/50 p-4">
@@ -26,9 +28,9 @@ function MemoryList({
         <p className="mt-3 text-sm text-slate-600">{emptyLabel}</p>
       ) : (
         <div className="mt-3 flex flex-wrap gap-2">
-          {items.map((item) => (
+          {items.map((item, index) => (
             <span
-              key={item}
+              key={`${keyPrefix}:${index}:${item}`}
               className="rounded-full border border-black/10 bg-white/80 px-3 py-2 text-sm text-slate-800"
             >
               {item}
@@ -134,6 +136,7 @@ export function EntityMemoryPanel({
                   title="Recent Topics"
                   emptyLabel="当前还没有 recent_topics。"
                   items={memory.recent_topics}
+                  keyPrefix="recent_topics"
                 />
 
                 <section className="rounded-3xl border border-black/10 bg-white/50 p-4">
@@ -173,12 +176,14 @@ export function EntityMemoryPanel({
                   title="Weak Concepts"
                   emptyLabel="当前还没有 weak_concepts。"
                   items={memory.weak_concepts}
+                  keyPrefix="weak_concepts"
                 />
 
                 <MemoryList
                   title="Mastered Concepts"
                   emptyLabel="当前还没有 mastered_concepts。"
                   items={memory.mastered_concepts}
+                  keyPrefix="mastered_concepts"
                 />
 
                 <section className="rounded-3xl border border-black/10 bg-white/50 p-4">

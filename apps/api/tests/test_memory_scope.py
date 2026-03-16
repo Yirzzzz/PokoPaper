@@ -289,6 +289,12 @@ class StableChatModeTestCase(unittest.TestCase):
         self.assertEqual(len(listed), 1)
         self.assertEqual(listed[0]["session_id"], global_session["session_id"])
 
+    def test_local_store_uses_shared_lock_across_repository_instances(self) -> None:
+        first = LocalStoreRepository()
+        second = LocalStoreRepository()
+
+        self.assertIs(first._lock, second._lock)
+
     def test_answer_prompts_include_short_term_context_without_classification_prompt(self) -> None:
         prompt = build_agent_answer_prompt(
             question="这篇论文的方法是什么？",
@@ -1077,6 +1083,53 @@ class StableChatModeTestCase(unittest.TestCase):
         self.assertEqual(first["method"], "方法一")
         self.assertEqual(second["method"], "方法二")
         self.assertNotEqual(first["paper_id"], second["paper_id"])
+
+    def test_legacy_partial_paper_entity_card_is_normalized_when_listed(self) -> None:
+        repo = LocalStoreRepository()
+        repo.upsert_paper(
+            {
+                "id": "paper-card-legacy",
+                "title": "Paper Card Legacy",
+                "authors": [],
+                "abstract": "",
+                "status": "ready",
+                "progress_percent": 100,
+                "category": "RAG",
+                "tags": [],
+                "file_path": "",
+                "created_at": "2026-03-14T00:00:00+00:00",
+                "updated_at": "2026-03-14T00:00:00+00:00",
+            }
+        )
+        repo.save_overview(
+            "paper-card-legacy",
+            {
+                "research_motivation": "旧系统没有把卡片字段补全。",
+                "problem_definition": "需要兼容旧版结构。",
+                "main_contributions": ["补全缺失字段"],
+                "method_summary": "读取时归一化并回写。",
+                "main_experiments": [],
+                "prerequisite_knowledge": [],
+                "key_modules": [],
+                "transferable_insights": [],
+                "conclusion": "兼容旧数据。",
+            },
+        )
+        repo.save_paper_entity_card(
+            "paper-card-legacy",
+            {
+                "paper_id": "paper-card-legacy",
+                "paper_title": "Paper Card Legacy",
+                "method": "旧版只有 method 字段",
+            },
+        )
+
+        listed = PaperEntityMemoryService().list_cards()
+
+        self.assertEqual(len(listed), 1)
+        self.assertEqual(listed[0]["paper_id"], "paper-card-legacy")
+        self.assertIn("旧系统没有把卡片字段补全", listed[0]["summary_card"])
+        self.assertIn("读取时归一化并回写", listed[0]["method"])
 
 
 if __name__ == "__main__":

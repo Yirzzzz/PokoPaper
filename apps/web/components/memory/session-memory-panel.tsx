@@ -135,8 +135,11 @@ export function SessionMemoryPanel({ initialItems }: SessionMemoryPanelProps) {
                   <p className="mt-3 text-sm text-slate-600">当前没有 recent_questions。</p>
                 ) : (
                   <div className="mt-3 space-y-2">
-                    {selectedItem.recent_questions.map((question) => (
-                      <div key={question} className="rounded-2xl border border-black/10 bg-white/70 px-3 py-3 text-sm text-slate-800">
+                    {selectedItem.recent_questions.map((question, index) => (
+                      <div
+                        key={`${selectedItem.conversation_id}:question:${index}:${question}`}
+                        className="rounded-2xl border border-black/10 bg-white/70 px-3 py-3 text-sm text-slate-800"
+                      >
                         {question}
                       </div>
                     ))}

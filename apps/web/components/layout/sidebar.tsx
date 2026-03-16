@@ -1,14 +1,11 @@
 import Link from "next/link";
-import { BookOpen, BrainCircuit, IdCard, Library, MessageSquare, ScrollText, Waypoints } from "lucide-react";
+import { BookOpen, BrainCircuit, Library, MessageSquare } from "lucide-react";
 
 const navItems = [
   { href: "/", label: "图鉴研究所", icon: BookOpen },
   { href: "/dex", label: "论文图鉴", icon: Library },
   { href: "/chat", label: "对战记录", icon: MessageSquare },
-  { href: "/session-memory", label: "瞬时记忆", icon: Waypoints },
-  { href: "/session-summary", label: "短时记忆", icon: ScrollText },
-  { href: "/memory", label: "实体记忆", icon: BrainCircuit },
-  { href: "/paper-memory", label: "论文记忆", icon: IdCard },
+  { href: "/memory", label: "记忆中心", icon: BrainCircuit },
 ] as const;
 
 export function Sidebar() {

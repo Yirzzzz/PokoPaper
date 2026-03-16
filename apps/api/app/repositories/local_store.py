@@ -12,14 +12,17 @@ from app.schemas.chat import ConversationType
 
 
 class LocalStoreRepository:
+    _locks: dict[str, Lock] = {}
+    _locks_guard = Lock()
+
     def __init__(self) -> None:
         self.storage_dir = Path(settings.storage_dir)
         self.db_dir = self.storage_dir / "db"
         self.files_dir = self.storage_dir / "papers"
         self.db_dir.mkdir(parents=True, exist_ok=True)
         self.files_dir.mkdir(parents=True, exist_ok=True)
-        self._lock = Lock()
         self.db_path = self.db_dir / "store.json"
+        self._lock = self._get_lock(self.db_path)
         if not self.db_path.exists():
             self._write(
                 {
@@ -36,6 +39,16 @@ class LocalStoreRepository:
                 }
             )
 
+    @classmethod
+    def _get_lock(cls, db_path: Path) -> Lock:
+        key = str(db_path.resolve())
+        with cls._locks_guard:
+            existing = cls._locks.get(key)
+            if existing is None:
+                existing = Lock()
+                cls._locks[key] = existing
+            return existing
+
     def _read(self) -> dict[str, Any]:
         with self._lock:
             data = json.loads(self.db_path.read_text(encoding="utf-8"))
@@ -50,10 +63,12 @@ class LocalStoreRepository:
 
     def _write(self, data: dict[str, Any]) -> None:
         with self._lock:
-            self.db_path.write_text(
+            temp_path = self.db_path.with_suffix(".tmp")
+            temp_path.write_text(
                 json.dumps(data, ensure_ascii=False, indent=2),
                 encoding="utf-8",
             )
+            temp_path.replace(self.db_path)
 
     @staticmethod
     def _normalize_chat_messages(data: dict[str, Any]) -> dict[str, Any]:

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from typing import Any
 
 from app.repositories.factory import get_repository
 from app.schemas.memory import PaperEntityMemoryCard
@@ -35,6 +36,58 @@ class PaperEntityMemoryService:
             if name and name not in keywords:
                 keywords.append(name)
         return keywords[:8]
+
+    def _normalize_card(self, paper_id: str, card: dict[str, Any] | None) -> dict[str, Any]:
+        paper = self.repo.get_paper(paper_id)
+        overview = self.repo.get_overview(paper_id) if hasattr(self.repo, "get_overview") else None
+
+        if paper is not None and overview is not None:
+            required_fields = {
+                "paper_title",
+                "created_at",
+                "updated_at",
+                "summary_card",
+                "motivation",
+                "problem",
+                "core_proposal",
+                "method",
+                "value",
+                "resolved_gap",
+                "test_data",
+                "key_results",
+                "keywords",
+            }
+            if not card or not required_fields.issubset(set(card.keys())):
+                rebuilt = self.build_card(
+                    paper_id=paper_id,
+                    paper_title=paper.get("title", paper_id),
+                    overview=overview,
+                    created_at=(card or {}).get("created_at", paper.get("created_at", self._now())),
+                    updated_at=(card or {}).get("updated_at", paper.get("updated_at", self._now())),
+                )
+                self.repo.save_paper_entity_card(paper_id, rebuilt)
+                return rebuilt
+
+        payload = {
+            "paper_id": paper_id,
+            "paper_title": (card or {}).get("paper_title") or (paper or {}).get("title") or paper_id,
+            "created_at": (card or {}).get("created_at") or (paper or {}).get("created_at") or self._now(),
+            "updated_at": (card or {}).get("updated_at") or (paper or {}).get("updated_at") or self._now(),
+            "summary_card": (card or {}).get("summary_card", ""),
+            "motivation": (card or {}).get("motivation", ""),
+            "problem": (card or {}).get("problem", ""),
+            "core_proposal": (card or {}).get("core_proposal", ""),
+            "method": (card or {}).get("method", ""),
+            "value": (card or {}).get("value", ""),
+            "resolved_gap": (card or {}).get("resolved_gap", ""),
+            "test_data": (card or {}).get("test_data", ""),
+            "key_results": (card or {}).get("key_results", ""),
+            "keywords": (card or {}).get("keywords") or [],
+        }
+        normalized = PaperEntityMemoryCard(**payload).model_dump()
+        if card != normalized:
+            self.repo.save_paper_entity_card(paper_id, normalized)
+        return normalized
 
     def build_card(self, paper_id: str, paper_title: str, overview: dict, created_at: str = "", updated_at: str = "") -> dict:
         motivation = self._clean_text(overview.get("research_motivation"), "当前版本未提取到明确动机。")
@@ -111,7 +164,14 @@ class PaperEntityMemoryService:
         card = self.repo.get_paper_entity_card(paper_id)
         if card is None:
             raise KeyError(f"paper entity memory card not found: {paper_id}")
-        return card
+        return self._normalize_card(paper_id, card)
 
     def list_cards(self) -> list[dict]:
-        return self.repo.list_paper_entity_cards()
+        normalized_items: list[dict[str, Any]] = []
+        for item in self.repo.list_paper_entity_cards():
+            paper_id = item.get("paper_id")
+            if not paper_id:
+                continue
+            normalized_items.append(self._normalize_card(paper_id, item))
+        normalized_items.sort(key=lambda item: item.get("updated_at", ""), reverse=True)
+        return normalized_items

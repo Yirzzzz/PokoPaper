@@ -89,7 +89,6 @@ export function PaperEntityMemoryPanel({ initialItems }: PaperEntityMemoryPanelP
                 }`}
               >
                 <p className="text-sm font-medium text-slate-900">{item.paper_title}</p>
-                <p className="mt-2 line-clamp-4 text-sm leading-6 text-slate-700">{item.summary_card}</p>
                 <div className="mt-3 flex flex-wrap gap-2">
                   {item.keywords.slice(0, 3).map((keyword) => (
                     <span
