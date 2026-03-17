@@ -26,12 +26,17 @@ class PaperCompanionAgent:
                 selected_model=selected_model,
                 enable_thinking=enable_thinking,
             )
-            self.memory_service.update_user_memory_from_conversation(
+            long_term_decision = self.memory_service.build_long_term_write_decision(
+                conversation_id=session_id,
                 paper_id=None,
                 question=question,
                 answer=answer["answer_md"],
-                overview=None,
             )
+            recorded_items = self.memory_service.record_long_term_write_decision(long_term_decision)
+            debug_info = answer.get("debug_info") or {}
+            debug_info["long_term_memory_write_decision"] = long_term_decision
+            debug_info["recorded_long_term_memory_items"] = recorded_items
+            answer["debug_info"] = debug_info
             self.short_term_memory.update_short_term_memory(
                 session_id,
                 question,
@@ -47,12 +52,17 @@ class PaperCompanionAgent:
             selected_model=selected_model,
             enable_thinking=enable_thinking,
         )
-        self.memory_service.update_user_memory_from_conversation(
+        long_term_decision = self.memory_service.build_long_term_write_decision(
+            conversation_id=session_id,
             paper_id=paper_id,
             question=question,
             answer=answer["answer_md"],
-            overview=answer.get("overview"),
         )
+        recorded_items = self.memory_service.record_long_term_write_decision(long_term_decision)
+        debug_info = answer.get("debug_info") or {}
+        debug_info["long_term_memory_write_decision"] = long_term_decision
+        debug_info["recorded_long_term_memory_items"] = recorded_items
+        answer["debug_info"] = debug_info
         self.short_term_memory.update_short_term_memory(
             session_id,
             question,

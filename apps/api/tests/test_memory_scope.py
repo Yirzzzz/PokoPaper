@@ -941,7 +941,7 @@ class StableChatModeTestCase(unittest.TestCase):
         self.assertNotIn("MoE", memory["weak_concepts"])
         self.assertEqual(memory["cross_paper_links"][0]["target_paper_id"], "ext:HyDE")
 
-    def test_agent_writes_user_memory_from_conversation_without_touching_prompt_memory_chain(self) -> None:
+    def test_agent_attaches_long_term_write_decision_without_writing_long_term_store(self) -> None:
         repo = LocalStoreRepository()
         repo.upsert_paper(
             {
@@ -960,16 +960,16 @@ class StableChatModeTestCase(unittest.TestCase):
         )
         self._save_test_overview(repo, "paper-agent-memory")
 
-        PaperCompanionAgent().answer(
+        answer = PaperCompanionAgent().answer(
             paper_id="paper-agent-memory",
             session_id="session-agent-memory",
             question="我没懂 Retrieval 是什么，能通俗举例吗？",
             selected_model="disabled-test-model",
         )
 
-        memory = MemoryService().get_user_memory()
-        self.assertIn("Retrieval", memory["weak_concepts"])
-        self.assertEqual(memory["preferred_explanation_style"], "intuitive_with_examples")
+        decision = (answer.get("debug_info") or {}).get("long_term_memory_write_decision") or {}
+        self.assertTrue(decision.get("should_write"))
+        self.assertEqual(decision["writes"][0]["conversation_id"], "session-agent-memory")
 
     def test_paper_entity_memory_card_can_be_built_from_overview(self) -> None:
         repo = LocalStoreRepository()

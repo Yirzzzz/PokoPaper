@@ -189,6 +189,11 @@ export type MemoryItem = {
   write_confidence?: number | null;
   source_question?: string | null;
   source_answer_preview?: string | null;
+  target_scope?: string | null;
+  target_field?: string | null;
+  operation?: string | null;
+  source_type?: string | null;
+  evidence_count?: number | null;
 };
 
 export type MemoryItemListResponse = {
@@ -244,4 +249,50 @@ export type SessionSummaryView = {
 export type SessionSummaryListResponse = {
   items: SessionSummaryView[];
   total: number;
+};
+
+export type LongTermMemoryItem = {
+  item_id: string;
+  memory_type: string;
+  memory_text: string;
+  source_type: string;
+  source_scope: "global_chat" | "paper_chat" | string;
+  conversation_id: string;
+  conversation_title?: string | null;
+  paper_id?: string | null;
+  paper_title?: string | null;
+  confidence: number;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+};
+
+export type LongTermMemoryListResponse = {
+  items: LongTermMemoryItem[];
+  total: number;
+};
+
+export type MemoryWriteAction = {
+  target_scope: string;
+  target_field: string;
+  operation: string;
+  value: unknown;
+  reason: string;
+  confidence: number;
+  evidence_count: number;
+  source_type: string;
+  last_updated_at: string;
+  memory_type: string;
+  payload: Record<string, unknown>;
+};
+
+export type MemoryWriteDecision = {
+  should_write: boolean;
+  reason?: string | null;
+  threshold: number;
+  writes: MemoryWriteAction[];
+};
+
+export type MemoryWriteInspectResponse = {
+  decision: MemoryWriteDecision;
 };

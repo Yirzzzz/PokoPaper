@@ -1,11 +1,12 @@
 import Link from "next/link";
-import { BookOpen, BrainCircuit, Library, MessageSquare } from "lucide-react";
+import { BookOpen, BrainCircuit, Library, MessageSquare, Database } from "lucide-react";
 
 const navItems = [
   { href: "/", label: "图鉴研究所", icon: BookOpen },
   { href: "/dex", label: "论文图鉴", icon: Library },
   { href: "/chat", label: "对战记录", icon: MessageSquare },
   { href: "/memory", label: "记忆中心", icon: BrainCircuit },
+  { href: "/long-term-memory", label: "长期记忆", icon: Database },
 ] as const;
 
 export function Sidebar() {

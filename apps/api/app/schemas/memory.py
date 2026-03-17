@@ -66,6 +66,69 @@ class MemoryWriteDecision(BaseModel):
     writes: list[MemoryWriteAction] = Field(default_factory=list)
 
 
+class LongTermMemoryWriteAction(BaseModel):
+    memory_type: str
+    memory_text: str
+    source_type: str
+    source_scope: str
+    conversation_id: str
+    paper_id: str | None = None
+    confidence: float = 0.0
+    metadata: dict = Field(default_factory=dict)
+
+
+class LongTermMemoryWriteDecision(BaseModel):
+    should_write: bool
+    reason: str | None = None
+    writes: list[LongTermMemoryWriteAction] = Field(default_factory=list)
+
+
+class LongTermMemoryWriteInspectRequest(BaseModel):
+    source_type: str = "dialog"
+    conversation_id: str
+    paper_id: str | None = None
+    question: str
+    answer: str | None = None
+
+
+class LongTermMemoryWriteInspectResponse(BaseModel):
+    decision: LongTermMemoryWriteDecision
+
+
+class LongTermMemoryItem(BaseModel):
+    item_id: str
+    memory_type: str
+    memory_text: str
+    source_type: str
+    source_scope: str
+    conversation_id: str
+    conversation_title: str | None = None
+    paper_id: str | None = None
+    paper_title: str | None = None
+    confidence: float = 0.0
+    metadata: dict = Field(default_factory=dict)
+    created_at: str
+    updated_at: str
+
+
+class LongTermMemoryListResponse(BaseModel):
+    items: list[LongTermMemoryItem]
+    total: int
+
+
+class MemoryWriteInspectRequest(BaseModel):
+    source_type: str = "dialog"
+    session_id: str | None = None
+    paper_id: str | None = None
+    user_id: str = "local-user"
+    question: str = ""
+    answer: str | None = None
+
+
+class MemoryWriteInspectResponse(BaseModel):
+    decision: dict
+
+
 class RetrievedMemoryItem(BaseModel):
     source_scope: str
     memory_type: str

@@ -6,8 +6,11 @@ from datetime import UTC, datetime
 from typing import Any
 
 from app.repositories.factory import get_repository
+from app.schemas.chat import ConversationType
 from app.schemas.memory import (
     CrossPaperRecallResult,
+    LongTermMemoryItem,
+    LongTermMemoryWriteDecision,
     MemoryRetrievalResult,
     MemoryWriteAction,
     MemoryWriteDecision,
@@ -21,6 +24,7 @@ from app.schemas.memory import (
     SessionMemoryRecord,
     UserMemoryRecord,
 )
+from app.services.memory.long_term_write_policy import decide_long_term_memory_writes
 
 DEFAULT_USER_ID = "local-user"
 logger = logging.getLogger(__name__)
@@ -67,6 +71,120 @@ USER_ITEM_TYPES = {
 class MemoryService:
     def __init__(self) -> None:
         self.repo = get_repository()
+
+    def _resolve_source_scope(self, conversation_id: str, paper_id: str | None = None) -> str:
+        session = self.repo.get_chat_session(conversation_id) if hasattr(self.repo, "get_chat_session") else None
+        conversation_type = (session or {}).get("conversation_type")
+        if conversation_type == ConversationType.PAPER_CHAT or paper_id:
+            return ConversationType.PAPER_CHAT
+        return ConversationType.GLOBAL_CHAT
+
+    def build_long_term_write_decision(
+        self,
+        *,
+        conversation_id: str,
+        paper_id: str | None,
+        question: str,
+        answer: str | None = None,
+        source_type: str = "dialog",
+    ) -> dict:
+        recent_messages = self.repo.list_chat_messages(conversation_id) if hasattr(self.repo, "list_chat_messages") else []
+        decision = decide_long_term_memory_writes(
+            source_type=source_type,
+            source_scope=self._resolve_source_scope(conversation_id, paper_id),
+            conversation_id=conversation_id,
+            paper_id=paper_id,
+            question=question,
+            answer=answer or "",
+            recent_messages=recent_messages[-12:],
+        )
+        logger.info(
+            "long_term_memory.write_policy: should_write=%s conversation=%s paper=%s writes=%s",
+            decision.should_write,
+            conversation_id,
+            paper_id,
+            [f"{item.source_scope}:{item.memory_type}:{item.confidence:.2f}" for item in decision.writes],
+        )
+        return decision.model_dump()
+
+    def inspect_long_term_write_decision(
+        self,
+        *,
+        conversation_id: str,
+        paper_id: str | None,
+        question: str,
+        answer: str | None = None,
+        source_type: str = "dialog",
+    ) -> dict:
+        return self.build_long_term_write_decision(
+            conversation_id=conversation_id,
+            paper_id=paper_id,
+            question=question,
+            answer=answer,
+            source_type=source_type,
+        )
+
+    def _build_long_term_item_id(
+        self,
+        *,
+        source_scope: str,
+        conversation_id: str,
+        paper_id: str | None,
+        memory_type: str,
+        memory_text: str,
+    ) -> str:
+        digest = sha1(
+            f"{source_scope}|{conversation_id}|{paper_id or ''}|{memory_type}|{memory_text}".encode("utf-8")
+        ).hexdigest()[:18]
+        return f"ltm-{digest}"
+
+    def record_long_term_write_decision(self, decision: dict) -> list[dict]:
+        writes = decision.get("writes", []) if isinstance(decision, dict) else []
+        if not writes or not hasattr(self.repo, "save_long_term_memory_item"):
+            return []
+        recorded: list[dict] = []
+        for raw_action in writes:
+            conversation_id = raw_action.get("conversation_id")
+            memory_type = raw_action.get("memory_type")
+            memory_text = self._safe_string(raw_action.get("memory_text"))
+            if not conversation_id or not memory_type or not memory_text:
+                continue
+            source_scope = raw_action.get("source_scope", "global_chat")
+            paper_id = raw_action.get("paper_id")
+            item_id = self._build_long_term_item_id(
+                source_scope=source_scope,
+                conversation_id=conversation_id,
+                paper_id=paper_id,
+                memory_type=memory_type,
+                memory_text=memory_text,
+            )
+            existing = self.repo.get_long_term_memory_item(item_id) if hasattr(self.repo, "get_long_term_memory_item") else None
+            session = self.repo.get_chat_session(conversation_id) if hasattr(self.repo, "get_chat_session") else None
+            paper = self.repo.get_paper(paper_id) if paper_id and hasattr(self.repo, "get_paper") else None
+            metadata = {**(existing or {}).get("metadata", {}), **(raw_action.get("metadata") or {})}
+            item = LongTermMemoryItem(
+                item_id=item_id,
+                memory_type=memory_type,
+                memory_text=memory_text,
+                source_type=raw_action.get("source_type", "dialog"),
+                source_scope=source_scope,
+                conversation_id=conversation_id,
+                conversation_title=(session or {}).get("title"),
+                paper_id=paper_id,
+                paper_title=(paper or {}).get("title"),
+                confidence=max(float((existing or {}).get("confidence", 0.0) or 0.0), float(raw_action.get("confidence", 0.0) or 0.0)),
+                metadata=metadata,
+                created_at=(existing or {}).get("created_at", self._now()),
+                updated_at=self._now(),
+            )
+            self.repo.save_long_term_memory_item(item_id, item.model_dump())
+            recorded.append(item.model_dump())
+        return recorded
+
+    def list_long_term_memory_items(self) -> list[dict]:
+        if not hasattr(self.repo, "list_long_term_memory_items"):
+            return []
+        return self.repo.list_long_term_memory_items()
 
     @staticmethod
     def session_scope(session_id: str) -> str:

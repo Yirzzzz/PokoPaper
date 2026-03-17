@@ -31,6 +31,7 @@ class LocalStoreRepository:
                     "structures": {},
                     "overviews": {},
                     "paper_entity_cards": {},
+                    "long_term_memories": {},
                     "memories": {},
                     "memory_item_states": {},
                     "memory_item_meta": {},
@@ -55,6 +56,7 @@ class LocalStoreRepository:
         normalized = self._normalize_chat_messages(data)
         normalized = self._normalize_chat_sessions(normalized)
         normalized = self._normalize_scoped_memories(normalized)
+        normalized.setdefault("long_term_memories", {})
         normalized.setdefault("memory_item_states", {})
         normalized.setdefault("memory_item_meta", {})
         if normalized != data:
@@ -222,6 +224,12 @@ class LocalStoreRepository:
         data["structures"].pop(paper_id, None)
         data["overviews"].pop(paper_id, None)
         data.get("paper_entity_cards", {}).pop(paper_id, None)
+        long_term_memories = data.get("long_term_memories", {})
+        keys_to_remove = [
+            item_id for item_id, item in long_term_memories.items() if item.get("paper_id") == paper_id
+        ]
+        for item_id in keys_to_remove:
+            long_term_memories.pop(item_id, None)
         data["memories"].pop(paper_id, None)
         data["memories"].pop(f"paper:{paper_id}", None)
         for session_id in deleted_session_ids:
@@ -294,6 +302,21 @@ class LocalStoreRepository:
     def list_paper_entity_cards(self) -> list[dict[str, Any]]:
         data = self._read()
         items = list(deepcopy(data.get("paper_entity_cards", {})).values())
+        items.sort(key=lambda item: item.get("updated_at", ""), reverse=True)
+        return items
+
+    def save_long_term_memory_item(self, item_id: str, item: dict[str, Any]) -> None:
+        data = self._read()
+        data.setdefault("long_term_memories", {})[item_id] = item
+        self._write(data)
+
+    def get_long_term_memory_item(self, item_id: str) -> dict[str, Any] | None:
+        data = self._read()
+        return deepcopy(data.get("long_term_memories", {}).get(item_id))
+
+    def list_long_term_memory_items(self) -> list[dict[str, Any]]:
+        data = self._read()
+        items = list(deepcopy(data.get("long_term_memories", {})).values())
         items.sort(key=lambda item: item.get("updated_at", ""), reverse=True)
         return items
 

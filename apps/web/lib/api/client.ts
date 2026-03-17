@@ -3,6 +3,8 @@ import type {
   ChatHistoryMessage,
   ChatModelOption,
   ChatResponse,
+  LongTermMemoryListResponse,
+  MemoryWriteInspectResponse,
   MemoryItem,
   MemoryItemListResponse,
   MemoryOverview,
@@ -69,6 +71,29 @@ export async function fetchPaperStructure(paperId: string) {
 
 export async function fetchMemoryOverview() {
   return getJson<MemoryOverview>("/memory/overview");
+}
+
+export async function fetchLongTermMemories() {
+  return getJson<LongTermMemoryListResponse>("/memory/long-term");
+}
+
+export async function inspectMemoryWritePolicy(payload: {
+  source_type: string;
+  session_id?: string | null;
+  paper_id?: string | null;
+  user_id?: string;
+  question: string;
+  answer?: string | null;
+}) {
+  const response = await fetch(`${API_BASE_URL}/memory/write-policy/inspect`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    throw new Error("Inspect memory write policy failed");
+  }
+  return response.json() as Promise<MemoryWriteInspectResponse>;
 }
 
 export async function fetchPaperMemory(paperId: string) {

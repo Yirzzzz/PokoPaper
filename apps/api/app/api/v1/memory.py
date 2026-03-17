@@ -1,6 +1,12 @@
 from fastapi import APIRouter, HTTPException, Query
 
 from app.schemas.memory import (
+    LongTermMemoryItem,
+    LongTermMemoryListResponse,
+    MemoryWriteInspectRequest,
+    MemoryWriteInspectResponse,
+    LongTermMemoryWriteInspectRequest,
+    LongTermMemoryWriteInspectResponse,
     MemoryItem,
     MemoryItemListResponse,
     MemoryOverviewResponse,
@@ -51,6 +57,39 @@ def get_paper_entity_memory(paper_id: str) -> dict:
 @router.get("/user", response_model=UserMemoryResponse)
 def get_user_memory() -> dict:
     return memory_service.get_user_memory()
+
+
+@router.get("/long-term", response_model=LongTermMemoryListResponse)
+def list_long_term_memories() -> dict:
+    items = memory_service.list_long_term_memory_items()
+    return {"items": items, "total": len(items)}
+
+
+@router.post("/long-term-write-policy/inspect", response_model=LongTermMemoryWriteInspectResponse)
+def inspect_long_term_write_policy(request: LongTermMemoryWriteInspectRequest) -> dict:
+    return {
+        "decision": memory_service.inspect_long_term_write_decision(
+            conversation_id=request.conversation_id,
+            paper_id=request.paper_id,
+            question=request.question,
+            answer=request.answer,
+            source_type=request.source_type,
+        )
+    }
+
+
+@router.post("/write-policy/inspect", response_model=MemoryWriteInspectResponse)
+def inspect_memory_write_policy(request: MemoryWriteInspectRequest) -> dict:
+    return {
+        "decision": memory_service.build_write_decision(
+            paper_id=request.paper_id or "",
+            session_id=request.session_id or "inspect-session",
+            question=request.question,
+            answer=request.answer or "",
+            overview=memory_service.repo.get_overview(request.paper_id) if request.paper_id and hasattr(memory_service.repo, "get_overview") else None,
+            user_id=request.user_id,
+        )
+    }
 
 
 @router.get("/items", response_model=MemoryItemListResponse)

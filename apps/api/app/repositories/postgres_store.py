@@ -123,6 +123,15 @@ class PostgresStoreRepository:
     def list_paper_entity_cards(self) -> list[dict[str, Any]]:
         return self._local_store().list_paper_entity_cards()
 
+    def save_long_term_memory_item(self, item_id: str, item: dict[str, Any]) -> None:
+        self._local_store().save_long_term_memory_item(item_id, item)
+
+    def get_long_term_memory_item(self, item_id: str) -> dict[str, Any] | None:
+        return self._local_store().get_long_term_memory_item(item_id)
+
+    def list_long_term_memory_items(self) -> list[dict[str, Any]]:
+        return self._local_store().list_long_term_memory_items()
+
     def save_memory(self, paper_id: str, memory: dict[str, Any]) -> None:
         with get_session() as session:
             model = session.get(ReadingMemoryModel, paper_id)
